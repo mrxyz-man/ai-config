@@ -1,11 +1,13 @@
 import { Command } from "commander";
 
-import { ConfigResolverPort, ConfigValidatorPort } from "./ports";
+import { AuditLoggerPort, ConfigResolverPort, ConfigValidatorPort, PolicyGatePort } from "./ports";
 import { ModuleRegistry } from "./module-registry";
 
 export type CommandContext = {
   validator: ConfigValidatorPort;
   resolver: ConfigResolverPort;
+  policyGate: PolicyGatePort;
+  auditLogger: AuditLoggerPort;
   moduleRegistry: ModuleRegistry;
 };
 
@@ -41,4 +43,3 @@ export class CommandRegistry {
     }
   }
 }
-

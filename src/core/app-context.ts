@@ -2,6 +2,8 @@ import { builtInCommands } from "../commands/builtins";
 import { builtInModules } from "../modules/builtin-modules";
 import { AiConfigResolver } from "../services/ai-config-resolver";
 import { AiConfigValidator } from "../services/ai-config-validator";
+import { ToolCallingPolicyGate } from "../services/tool-calling-policy";
+import { YamlAuditLogger } from "../services/yaml-audit-logger";
 import { CommandRegistry, CommandContext } from "./command-registry";
 import { ModuleRegistry } from "./module-registry";
 
@@ -20,7 +22,9 @@ const buildFreshAppContext = (): AppContext => {
     commandRegistry,
     moduleRegistry,
     validator: new AiConfigValidator(),
-    resolver: new AiConfigResolver()
+    resolver: new AiConfigResolver(),
+    policyGate: new ToolCallingPolicyGate(),
+    auditLogger: new YamlAuditLogger()
   };
 };
 
@@ -38,4 +42,3 @@ export const getProcessSingletonAppContext = (): AppContext => {
 export const resetProcessSingletonAppContextForTests = (): void => {
   processSingletonContext = undefined;
 };
-

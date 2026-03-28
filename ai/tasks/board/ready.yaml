@@ -1,10 +1,4 @@
 tasks:
-  - id: "T8"
-    title: "Add tool-calling policy and audit hooks"
-    type: "task"
-    priority: "P1"
-    status: "ready"
-    dependencies: ["T5", "T7"]
   - id: "T9"
     title: "Add test baseline (unit + contract + e2e smoke)"
     type: "task"

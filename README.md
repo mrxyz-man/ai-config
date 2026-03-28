@@ -28,3 +28,4 @@ npm run dev
 - Modules are registered via module registry (`src/modules/builtin-modules.ts` + `src/core/module-registry.ts`).
 - Core service contracts are isolated as ports (`src/core/ports.ts`), so resolver/validator implementations can evolve without rewriting CLI wiring.
 - Singleton boundaries are explicitly defined in [docs/SINGLETON-BOUNDARIES.md](./docs/SINGLETON-BOUNDARIES.md), including test reset hooks.
+- Tool-calling policy and audit hooks are enforced through dedicated services (`ToolCallingPolicyGate`, `YamlAuditLogger`).

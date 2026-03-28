@@ -33,6 +33,15 @@ describe("CommandRegistry", () => {
           errors: []
         })
       },
+      policyGate: {
+        check: () => ({
+          allowed: true,
+          decision: "auto-run"
+        })
+      },
+      auditLogger: {
+        append: () => undefined
+      },
       validator: {
         validate: () => ({
           ok: true,
