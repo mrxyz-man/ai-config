@@ -34,6 +34,10 @@ type RequiredResolveInput = {
   contextSources: ContextSources;
 };
 
+type CustomOverridesFile = {
+  overrides?: Record<string, unknown>;
+};
+
 const REQUIRED_INPUTS = {
   ai: "ai/ai.yaml",
   modules: "ai/modules.yaml",
@@ -43,6 +47,7 @@ const REQUIRED_INPUTS = {
   textLocale: "ai/text/locale.yaml",
   contextSources: "ai/context/sources.yaml"
 } as const;
+const CUSTOM_OVERRIDES_FILE = "ai/custom/overrides.yaml";
 
 const toRelative = (projectRoot: string, absolutePath: string): string =>
   path.relative(projectRoot, absolutePath).replace(/\\/g, "/");
@@ -116,6 +121,105 @@ const buildResolved = (input: RequiredResolveInput): ResolvedConfig => ({
   context_priorities: input.contextSources.priority_sources,
   note: "Resolved by ai-config resolver v1"
 });
+
+const readCustomOverrides = (
+  absoluteRoot: string,
+  warnings: ResolveIssue[],
+  errors: ResolveIssue[]
+): Record<string, unknown> => {
+  const absolutePath = path.join(absoluteRoot, CUSTOM_OVERRIDES_FILE);
+  if (!fs.existsSync(absolutePath)) {
+    return {};
+  }
+
+  try {
+    const parsed = parseYaml(absolutePath) as CustomOverridesFile | null;
+    if (!parsed || typeof parsed !== "object") {
+      warnings.push({
+        file: CUSTOM_OVERRIDES_FILE,
+        message: "Custom overrides file is empty; no overrides applied"
+      });
+      return {};
+    }
+    if (!parsed.overrides) {
+      return {};
+    }
+    if (typeof parsed.overrides !== "object" || Array.isArray(parsed.overrides)) {
+      errors.push({
+        file: CUSTOM_OVERRIDES_FILE,
+        path: "overrides",
+        message: "Expected object at overrides"
+      });
+      return {};
+    }
+    return parsed.overrides;
+  } catch (error) {
+    errors.push({
+      file: CUSTOM_OVERRIDES_FILE,
+      message: `Failed to parse YAML: ${(error as Error).message}`
+    });
+    return {};
+  }
+};
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
+const applyOverrides = (
+  target: Record<string, unknown>,
+  overrides: Record<string, unknown>,
+  warnings: ResolveIssue[],
+  pathPrefix = ""
+): void => {
+  for (const [key, overrideValue] of Object.entries(overrides)) {
+    const fullPath = pathPrefix ? `${pathPrefix}.${key}` : key;
+
+    if (!(key in target)) {
+      warnings.push({
+        file: CUSTOM_OVERRIDES_FILE,
+        path: `overrides.${fullPath}`,
+        message: "Unknown override key was ignored"
+      });
+      continue;
+    }
+
+    const currentValue = target[key];
+    if (isPlainObject(currentValue) && isPlainObject(overrideValue)) {
+      applyOverrides(currentValue, overrideValue, warnings, fullPath);
+      continue;
+    }
+
+    target[key] = overrideValue;
+  }
+};
+
+const enforceResolvedInvariants = (
+  resolved: ResolvedConfig,
+  input: RequiredResolveInput,
+  errors: ResolveIssue[]
+): void => {
+  if (!resolved.execution.require_confirmation_for_mutations) {
+    errors.push({
+      file: CUSTOM_OVERRIDES_FILE,
+      path: "overrides.execution.require_confirmation_for_mutations",
+      message: "Enforced policy violation: require_confirmation_for_mutations must remain true"
+    });
+  }
+
+  const enabledByAi = Object.entries(input.ai.modules)
+    .filter(([, enabled]) => enabled)
+    .map(([name]) => name);
+
+  for (const moduleName of resolved.active_modules) {
+    if (!enabledByAi.includes(moduleName)) {
+      errors.push({
+        file: "ai/modules.yaml",
+        path: `active_modules.${moduleName}`,
+        message: `Module "${moduleName}" cannot be active because it is disabled in ai.yaml`
+      });
+    }
+  }
+};
 
 export class AiConfigResolver implements ConfigResolverPort<ResolvedConfig> {
   resolve(projectRoot: string): ResolveReport<ResolvedConfig> {
@@ -213,6 +317,32 @@ export class AiConfigResolver implements ConfigResolverPort<ResolvedConfig> {
       textLocale,
       contextSources
     });
+    const customOverrides = readCustomOverrides(absoluteRoot, warnings, errors);
+    if (errors.length > 0) {
+      return {
+        ok: false,
+        outputFile,
+        resolved: null,
+        resolvedModules: [],
+        checksum: null,
+        warnings,
+        errors
+      };
+    }
+
+    applyOverrides(resolved as unknown as Record<string, unknown>, customOverrides, warnings);
+    enforceResolvedInvariants(resolved, { ai, modules, agentRegistry, tasks, textEncoding, textLocale, contextSources }, errors);
+    if (errors.length > 0) {
+      return {
+        ok: false,
+        outputFile,
+        resolved: null,
+        resolvedModules: [],
+        checksum: null,
+        warnings,
+        errors
+      };
+    }
 
     const schemaCheck = ResolvedConfigSchema.safeParse(resolved);
     if (!schemaCheck.success) {

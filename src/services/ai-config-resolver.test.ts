@@ -40,5 +40,38 @@ describe("AiConfigResolver", () => {
     expect(result.ok).toBe(false);
     expect(result.errors.some((error) => error.file === "ai/tasks/config.yaml")).toBe(true);
   });
-});
 
+  it("applies custom overrides with higher precedence", () => {
+    const projectRoot = copyAiFolderToTempProject();
+    fs.writeFileSync(
+      path.join(projectRoot, "ai/custom/overrides.yaml"),
+      "overrides:\n  tasks:\n    mode: hybrid\n",
+      "utf8"
+    );
+
+    const resolver = new AiConfigResolver();
+    const result = resolver.resolve(projectRoot);
+
+    expect(result.ok).toBe(true);
+    expect(result.resolved?.tasks.mode).toBe("hybrid");
+  });
+
+  it("fails when custom overrides violate enforced policy", () => {
+    const projectRoot = copyAiFolderToTempProject();
+    fs.writeFileSync(
+      path.join(projectRoot, "ai/custom/overrides.yaml"),
+      "overrides:\n  execution:\n    require_confirmation_for_mutations: false\n",
+      "utf8"
+    );
+
+    const resolver = new AiConfigResolver();
+    const result = resolver.resolve(projectRoot);
+
+    expect(result.ok).toBe(false);
+    expect(
+      result.errors.some((error) =>
+        error.message.includes("Enforced policy violation: require_confirmation_for_mutations")
+      )
+    ).toBe(true);
+  });
+});
