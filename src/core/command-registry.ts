@@ -3,6 +3,8 @@ import { Command } from "commander";
 import {
   AuditLoggerPort,
   ConfigInitializerPort,
+  ConfigSyncPort,
+  ConfigExplainerPort,
   ConfigResolverPort,
   ConfigValidatorPort,
   PolicyGatePort
@@ -11,6 +13,8 @@ import { ModuleRegistry } from "./module-registry";
 
 export type CommandContext = {
   initializer: ConfigInitializerPort;
+  syncer: ConfigSyncPort;
+  explainer: ConfigExplainerPort;
   validator: ConfigValidatorPort;
   resolver: ConfigResolverPort;
   policyGate: PolicyGatePort;

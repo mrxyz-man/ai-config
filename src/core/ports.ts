@@ -86,3 +86,50 @@ export type InitReport = {
 export interface ConfigInitializerPort {
   init(projectRoot: string, options?: { force?: boolean; lang?: string; skipQuestions?: boolean }): InitReport;
 }
+
+export type SyncIssue = {
+  file: string;
+  message: string;
+  path?: string;
+};
+
+export type SyncReport = {
+  ok: boolean;
+  dryRun: boolean;
+  appliedChanges: string[];
+  plannedChanges: string[];
+  preservedCustomFiles: string[];
+  migrationSummary: string[];
+  warnings: SyncIssue[];
+  errors: SyncIssue[];
+};
+
+export interface ConfigSyncPort {
+  sync(projectRoot: string, options?: { dryRun?: boolean; withMigrations?: boolean; fromVersion?: string }): SyncReport;
+}
+
+export type ExplainIssue = {
+  file: string;
+  message: string;
+  path?: string;
+};
+
+export type ExplainMatch = {
+  key: string;
+  module: string;
+  value: unknown;
+  sources: string[];
+};
+
+export type ExplainReport = {
+  ok: boolean;
+  keyFilter?: string;
+  moduleFilter?: string;
+  matches: ExplainMatch[];
+  warnings: ExplainIssue[];
+  errors: ExplainIssue[];
+};
+
+export interface ConfigExplainerPort {
+  explain(projectRoot: string, options?: { key?: string; module?: string }): ExplainReport;
+}

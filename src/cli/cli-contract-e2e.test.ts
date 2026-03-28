@@ -15,7 +15,7 @@ type CliJsonEnvelope = {
 };
 
 const projectRoot = path.resolve(__dirname, "../..");
-const distCliPath = path.join(projectRoot, "dist/cli.js");
+const srcCliPath = path.join(projectRoot, "src/cli.ts");
 
 const createTempProjectWithAiConfig = (): string => {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), "ai-config-cli-e2e-"));
@@ -26,7 +26,7 @@ const createTempProjectWithAiConfig = (): string => {
 };
 
 const runCliJson = (args: string[]): { status: number | null; envelope: CliJsonEnvelope } => {
-  const run = spawnSync("node", [distCliPath, ...args], {
+  const run = spawnSync("node", ["-r", "ts-node/register/transpile-only", srcCliPath, ...args], {
     cwd: projectRoot,
     encoding: "utf8"
   });
@@ -77,6 +77,43 @@ describe("CLI contract + e2e smoke", () => {
     expect(fs.existsSync(path.join(tempProject, "ai/resolved.yaml"))).toBe(true);
   });
 
+  it("explain returns provenance matches in JSON envelope", () => {
+    const tempProject = createTempProjectWithAiConfig();
+    const result = runCliJson([
+      "explain",
+      "--cwd",
+      tempProject,
+      "--key",
+      "tasks.mode",
+      "--format",
+      "json"
+    ]);
+
+    expect(result.status).toBe(0);
+    expect(result.envelope.ok).toBe(true);
+    expect(result.envelope.command).toBe("explain");
+    expect(Array.isArray(result.envelope.data.matches)).toBe(true);
+    expect((result.envelope.data.matches as unknown[]).length).toBe(1);
+  });
+
+  it("explain returns exit code 4 for unknown key", () => {
+    const tempProject = createTempProjectWithAiConfig();
+    const result = runCliJson([
+      "explain",
+      "--cwd",
+      tempProject,
+      "--key",
+      "unknown.path",
+      "--format",
+      "json"
+    ]);
+
+    expect(result.status).toBe(4);
+    expect(result.envelope.ok).toBe(false);
+    expect(result.envelope.command).toBe("explain");
+    expect(result.envelope.errors.length).toBeGreaterThan(0);
+  });
+
   it("sync without --confirm is blocked by policy with exit code 5", () => {
     const tempProject = createTempProjectWithAiConfig();
     const result = runCliJson(["sync", "--cwd", tempProject, "--format", "json"]);
@@ -85,6 +122,42 @@ describe("CLI contract + e2e smoke", () => {
     expect(result.envelope.ok).toBe(false);
     expect(result.envelope.command).toBe("sync");
     expect(result.envelope.data.policyDecision).toBe("confirm-required");
+  });
+
+  it("sync with --confirm and --dry-run returns planned changes only", () => {
+    const tempProject = createTempProjectWithAiConfig();
+    const result = runCliJson([
+      "sync",
+      "--cwd",
+      tempProject,
+      "--confirm",
+      "--dry-run",
+      "--format",
+      "json"
+    ]);
+
+    expect(result.status).toBe(0);
+    expect(result.envelope.ok).toBe(true);
+    expect(result.envelope.command).toBe("sync");
+    expect(result.envelope.data.dryRun).toBe(true);
+    expect(Array.isArray(result.envelope.data.plannedChanges)).toBe(true);
+    expect(Array.isArray(result.envelope.data.appliedChanges)).toBe(true);
+    expect((result.envelope.data.appliedChanges as unknown[]).length).toBe(0);
+  });
+
+  it("sync with --confirm preserves ai/custom files", () => {
+    const tempProject = createTempProjectWithAiConfig();
+    const customFile = path.join(tempProject, "ai/custom/user-note.md");
+    fs.writeFileSync(customFile, "user custom data", "utf8");
+
+    const result = runCliJson(["sync", "--cwd", tempProject, "--confirm", "--format", "json"]);
+
+    expect(result.status).toBe(0);
+    expect(result.envelope.ok).toBe(true);
+    expect(result.envelope.command).toBe("sync");
+    expect(fs.readFileSync(customFile, "utf8")).toBe("user custom data");
+    expect(Array.isArray(result.envelope.data.preservedCustomFiles)).toBe(true);
+    expect((result.envelope.data.preservedCustomFiles as unknown[]).length).toBeGreaterThan(0);
   });
 
   it("init without --confirm is blocked by policy with exit code 5", () => {

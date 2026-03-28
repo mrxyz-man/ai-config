@@ -5,11 +5,6 @@ import { Command } from "commander";
 import { CommandDefinition } from "../core/command-registry";
 import { createEnvelope, emitEnvelope } from "../cli/output";
 
-const notImplemented = (name: string): void => {
-  console.log(`Command "${name}" is not implemented yet.`);
-  console.log('Run "ai-config --help" to see available commands.');
-};
-
 const applyPolicy = (input: {
   projectRoot: string;
   command: string;
@@ -152,9 +147,19 @@ export const builtInCommands: CommandDefinition[] = [
         .description("Sync managed configuration layers")
         .option("--cwd <path>", "Project root path", ".")
         .option("--format <format>", "Output format: human|json", "human")
+        .option("--dry-run", "Show planned changes without writing files", false)
+        .option("--with-migrations", "Apply compatible migrations", false)
+        .option("--from-version <version>", "Expected source config version")
         .option("--confirm", "Confirm execution for policy-gated command", false)
         .action(
-          (options: { cwd: string; format: "human" | "json"; confirm?: boolean }) => {
+          (options: {
+            cwd: string;
+            format: "human" | "json";
+            dryRun?: boolean;
+            withMigrations?: boolean;
+            fromVersion?: string;
+            confirm?: boolean;
+          }) => {
             const targetDir = path.resolve(options.cwd);
             const allowed = applyPolicy({
               context,
@@ -167,15 +172,61 @@ export const builtInCommands: CommandDefinition[] = [
               return;
             }
 
+            const report = context.syncer.sync(targetDir, {
+              dryRun: options.dryRun ?? false,
+              withMigrations: options.withMigrations ?? false,
+              fromVersion: options.fromVersion
+            });
+            const envelope = createEnvelope({
+              ok: report.ok,
+              command: "sync",
+              data: {
+                dryRun: report.dryRun,
+                appliedChanges: report.appliedChanges,
+                plannedChanges: report.plannedChanges,
+                preservedCustomFiles: report.preservedCustomFiles,
+                migrationSummary: report.migrationSummary
+              },
+              warnings: report.warnings,
+              errors: report.errors
+            });
+
+            emitEnvelope(envelope, options.format);
+            if (options.format === "human") {
+              if (report.ok) {
+                console.log(`Sync completed${report.dryRun ? " (dry-run)" : ""}.`);
+                console.log(`Planned changes: ${report.plannedChanges.length}`);
+                console.log(`Applied changes: ${report.appliedChanges.length}`);
+                if (report.preservedCustomFiles.length > 0) {
+                  console.log(`Preserved custom files: ${report.preservedCustomFiles.length}`);
+                }
+                if (report.migrationSummary.length > 0) {
+                  console.log(`Migrations: ${report.migrationSummary.join("; ")}`);
+                }
+                if (report.warnings.length > 0) {
+                  console.log(`Warnings: ${report.warnings.length}`);
+                }
+              } else {
+                console.error("Sync failed.");
+                for (const error of report.errors) {
+                  const location = error.path ? `${error.file}#${error.path}` : error.file;
+                  console.error(`- [ERROR] ${location}: ${error.message}`);
+                }
+              }
+            }
+
             context.auditLogger.append(targetDir, {
               actor: "user",
               command: "sync",
               timestamp: new Date().toISOString(),
               decision: "confirmed",
-              outcome: "failed",
-              message: "Not implemented yet"
+              outcome: report.ok ? "success" : "failed",
+              message: report.ok ? undefined : "Sync command failed"
             });
-            notImplemented("sync");
+
+            if (!report.ok) {
+              process.exitCode = 6;
+            }
           }
         );
     }
@@ -370,30 +421,75 @@ export const builtInCommands: CommandDefinition[] = [
         .description("Explain resolved provenance")
         .option("--cwd <path>", "Project root path", ".")
         .option("--format <format>", "Output format: human|json", "human")
+        .option("--key <path>", "Explain specific resolved key path")
+        .option("--module <name>", "Filter explanation by module name")
         .option("--confirm", "Confirm execution for policy-gated command", false)
-        .action((options: { cwd: string; format: "human" | "json"; confirm?: boolean }) => {
-          const targetDir = path.resolve(options.cwd);
-          const allowed = applyPolicy({
-            context,
-            projectRoot: targetDir,
-            command: "explain",
-            confirmed: options.confirm ?? false,
-            format: options.format
-          });
-          if (!allowed) {
-            return;
-          }
+        .action(
+          (options: {
+            cwd: string;
+            format: "human" | "json";
+            key?: string;
+            module?: string;
+            confirm?: boolean;
+          }) => {
+            const targetDir = path.resolve(options.cwd);
+            const allowed = applyPolicy({
+              context,
+              projectRoot: targetDir,
+              command: "explain",
+              confirmed: options.confirm ?? false,
+              format: options.format
+            });
+            if (!allowed) {
+              return;
+            }
 
-          context.auditLogger.append(targetDir, {
-            actor: "user",
-            command: "explain",
-            timestamp: new Date().toISOString(),
-            decision: "auto-run",
-            outcome: "failed",
-            message: "Not implemented yet"
-          });
-          notImplemented("explain");
-        });
+            const report = context.explainer.explain(targetDir, {
+              key: options.key,
+              module: options.module
+            });
+            const envelope = createEnvelope({
+              ok: report.ok,
+              command: "explain",
+              data: {
+                keyFilter: report.keyFilter,
+                moduleFilter: report.moduleFilter,
+                matches: report.matches
+              },
+              warnings: report.warnings,
+              errors: report.errors
+            });
+
+            emitEnvelope(envelope, options.format);
+            if (options.format === "human") {
+              if (report.ok) {
+                console.log(`Explain succeeded. Matches: ${report.matches.length}`);
+                for (const match of report.matches) {
+                  console.log(`- ${match.key} [${match.module}] <- ${match.sources.join(", ")}`);
+                }
+              } else {
+                console.error("Explain failed.");
+                for (const error of report.errors) {
+                  const location = error.path ? `${error.file}#${error.path}` : error.file;
+                  console.error(`- [ERROR] ${location}: ${error.message}`);
+                }
+              }
+            }
+
+            context.auditLogger.append(targetDir, {
+              actor: "user",
+              command: "explain",
+              timestamp: new Date().toISOString(),
+              decision: "auto-run",
+              outcome: report.ok ? "success" : "failed",
+              message: report.ok ? undefined : "Explain command failed"
+            });
+
+            if (!report.ok) {
+              process.exitCode = 4;
+            }
+          }
+        );
     }
   }
 ];

@@ -49,6 +49,26 @@ describe("CommandRegistry", () => {
           errors: []
         })
       },
+      syncer: {
+        sync: () => ({
+          ok: true,
+          dryRun: false,
+          appliedChanges: [],
+          plannedChanges: [],
+          preservedCustomFiles: [],
+          migrationSummary: [],
+          warnings: [],
+          errors: []
+        })
+      },
+      explainer: {
+        explain: () => ({
+          ok: true,
+          matches: [],
+          warnings: [],
+          errors: []
+        })
+      },
       policyGate: {
         check: () => ({
           allowed: true,
