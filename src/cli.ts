@@ -1,6 +1,9 @@
 #!/usr/bin/env node
 
 import { Command } from "commander";
+import path from "node:path";
+
+import { validateAiConfigContracts } from "./services/ai-config-validator";
 
 const program = new Command();
 
@@ -32,7 +35,30 @@ program
 program
   .command("validate")
   .description("Run configuration validation")
-  .action(() => notImplemented("validate"));
+  .option("--cwd <path>", "Project root path", ".")
+  .action((options: { cwd: string }) => {
+    const targetDir = path.resolve(options.cwd);
+    const report = validateAiConfigContracts(targetDir);
+
+    if (report.ok) {
+      console.log(`Validation passed. Checked ${report.validatedFiles.length} files.`);
+      if (report.warnings.length > 0) {
+        console.log(`Warnings: ${report.warnings.length}`);
+        for (const warning of report.warnings) {
+          const location = warning.path ? `${warning.file}#${warning.path}` : warning.file;
+          console.log(`- [WARN] ${location}: ${warning.message}`);
+        }
+      }
+      return;
+    }
+
+    console.error("Validation failed.");
+    for (const error of report.errors) {
+      const location = error.path ? `${error.file}#${error.path}` : error.file;
+      console.error(`- [ERROR] ${location}: ${error.message}`);
+    }
+    process.exitCode = 3;
+  });
 
 program
   .command("explain")

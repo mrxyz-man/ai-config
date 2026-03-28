@@ -14,6 +14,7 @@ patterns:
   - "test-before-merge"
   - "explicit error handling"
   - "idempotent operations where possible"
+  - "dictionary-based dispatch over long conditional chains"
 
 anti_patterns:
   - "silent behavior change"
@@ -21,10 +22,10 @@ anti_patterns:
   - "large unreviewable diffs"
   - "missing negative-path tests"
   - "magic constants without context"
+  - "long if-else chains for key-based routing"
 
 definition_of_done:
   - "change is validated"
   - "edge cases considered"
   - "no regressions in critical flow"
   - "docs/config updated if needed"
-

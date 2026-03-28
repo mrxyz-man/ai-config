@@ -13,15 +13,16 @@ patterns:
   - "small safe increments"
   - "explicit assumptions and constraints"
   - "traceable decisions"
+  - "table-driven or dictionary-driven control flow for extensibility"
 
 anti_patterns:
   - "premature abstraction"
   - "big-bang redesign"
   - "unclear ownership"
   - "hidden breaking changes"
+  - "branch-heavy routing logic that blocks scalable extension"
 
 definition_of_done:
   - "architecture decision is documented"
   - "risks and mitigations are explicit"
   - "interfaces are understandable by implementers"
-

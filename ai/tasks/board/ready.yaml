@@ -1,10 +1,4 @@
 tasks:
-  - id: "T4"
-    title: "Implement config domain contracts (v1)"
-    type: "task"
-    priority: "P0"
-    status: "ready"
-    dependencies: ["T1"]
   - id: "T5"
     title: "Implement scalable architecture skeleton (module/command registry)"
     type: "task"
