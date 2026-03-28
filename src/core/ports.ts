@@ -61,3 +61,28 @@ export type AuditEvent = {
 export interface AuditLoggerPort {
   append(projectRoot: string, event: AuditEvent): void;
 }
+
+export type InitIssue = {
+  file: string;
+  message: string;
+  path?: string;
+};
+
+export type InitReport = {
+  ok: boolean;
+  projectRoot: string;
+  createdFiles: string[];
+  updatedFiles: string[];
+  detected: {
+    hasPackageJson: boolean;
+    hasTypeScript: boolean;
+    hasNodeModules: boolean;
+  };
+  unresolvedQuestions: string[];
+  warnings: InitIssue[];
+  errors: InitIssue[];
+};
+
+export interface ConfigInitializerPort {
+  init(projectRoot: string, options?: { force?: boolean; lang?: string; skipQuestions?: boolean }): InitReport;
+}

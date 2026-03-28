@@ -51,5 +51,13 @@ describe("ToolCallingPolicyGate", () => {
     expect(result.allowed).toBe(false);
     expect(result.decision).toBe("deny");
   });
-});
 
+  it("uses default policy if policy file is missing", () => {
+    const gate = new ToolCallingPolicyGate();
+    const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), "ai-config-policy-empty-"));
+    const result = gate.check(projectRoot, "init", false);
+
+    expect(result.allowed).toBe(false);
+    expect(result.decision).toBe("confirm-required");
+  });
+});

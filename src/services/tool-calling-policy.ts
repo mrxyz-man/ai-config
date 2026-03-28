@@ -14,12 +14,34 @@ type ToolCallingPolicyFile = {
 };
 
 const POLICY_FILE_PATH = "ai/rules/tool-calling-policy.yaml";
+const DEFAULT_POLICY: ToolCallingPolicyFile = {
+  version: "1.0",
+  policy: "balanced",
+  auto_run: ["resolve", "validate", "explain"],
+  confirm_required: ["init", "sync", "update"],
+  deny: ["unknown_command"]
+};
 
 const readPolicyFile = (projectRoot: string): ToolCallingPolicyFile => {
   const absolutePath = path.join(projectRoot, POLICY_FILE_PATH);
+  if (!fs.existsSync(absolutePath)) {
+    return DEFAULT_POLICY;
+  }
+
   const raw = fs.readFileSync(absolutePath, "utf8");
-  const parsed = YAML.parse(raw) as ToolCallingPolicyFile;
-  return parsed;
+  const parsed = YAML.parse(raw) as ToolCallingPolicyFile | null;
+  if (!parsed) {
+    return DEFAULT_POLICY;
+  }
+  return {
+    version: parsed.version ?? DEFAULT_POLICY.version,
+    policy: parsed.policy ?? DEFAULT_POLICY.policy,
+    auto_run: Array.isArray(parsed.auto_run) ? parsed.auto_run : DEFAULT_POLICY.auto_run,
+    confirm_required: Array.isArray(parsed.confirm_required)
+      ? parsed.confirm_required
+      : DEFAULT_POLICY.confirm_required,
+    deny: Array.isArray(parsed.deny) ? parsed.deny : DEFAULT_POLICY.deny
+  };
 };
 
 export class ToolCallingPolicyGate implements PolicyGatePort {
@@ -62,4 +84,3 @@ export class ToolCallingPolicyGate implements PolicyGatePort {
     };
   }
 }
-

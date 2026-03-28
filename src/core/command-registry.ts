@@ -1,9 +1,16 @@
 import { Command } from "commander";
 
-import { AuditLoggerPort, ConfigResolverPort, ConfigValidatorPort, PolicyGatePort } from "./ports";
+import {
+  AuditLoggerPort,
+  ConfigInitializerPort,
+  ConfigResolverPort,
+  ConfigValidatorPort,
+  PolicyGatePort
+} from "./ports";
 import { ModuleRegistry } from "./module-registry";
 
 export type CommandContext = {
+  initializer: ConfigInitializerPort;
   validator: ConfigValidatorPort;
   resolver: ConfigResolverPort;
   policyGate: PolicyGatePort;

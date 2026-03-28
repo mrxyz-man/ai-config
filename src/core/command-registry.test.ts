@@ -22,6 +22,22 @@ describe("CommandRegistry", () => {
 
     registry.apply(program, {
       moduleRegistry: new ModuleRegistry(),
+      initializer: {
+        init: () => ({
+          ok: true,
+          projectRoot: ".",
+          createdFiles: [],
+          updatedFiles: [],
+          detected: {
+            hasPackageJson: true,
+            hasTypeScript: true,
+            hasNodeModules: false
+          },
+          unresolvedQuestions: [],
+          warnings: [],
+          errors: []
+        })
+      },
       resolver: {
         resolve: () => ({
           ok: true,

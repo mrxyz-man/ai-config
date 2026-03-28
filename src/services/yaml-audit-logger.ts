@@ -27,10 +27,10 @@ const readAuditFile = (absolutePath: string): AuditLogFile => {
 export class YamlAuditLogger implements AuditLoggerPort {
   append(projectRoot: string, event: AuditEvent): void {
     const absolutePath = path.join(projectRoot, AUDIT_LOG_PATH);
+    fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
     const current = readAuditFile(absolutePath);
     current.events.push(event);
     const serialized = YAML.stringify(current);
     fs.writeFileSync(absolutePath, serialized, "utf8");
   }
 }
-

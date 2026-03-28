@@ -86,4 +86,37 @@ describe("CLI contract + e2e smoke", () => {
     expect(result.envelope.command).toBe("sync");
     expect(result.envelope.data.policyDecision).toBe("confirm-required");
   });
+
+  it("init without --confirm is blocked by policy with exit code 5", () => {
+    const tempProject = createTempProjectWithAiConfig();
+    fs.rmSync(path.join(tempProject, "ai"), { recursive: true, force: true });
+
+    const result = runCliJson(["init", "--cwd", tempProject, "--format", "json"]);
+
+    expect(result.status).toBe(5);
+    expect(result.envelope.ok).toBe(false);
+    expect(result.envelope.command).toBe("init");
+    expect(result.envelope.data.policyDecision).toBe("confirm-required");
+  });
+
+  it("init with --confirm bootstraps ai and returns envelope", () => {
+    const tempProject = createTempProjectWithAiConfig();
+    fs.rmSync(path.join(tempProject, "ai"), { recursive: true, force: true });
+
+    const result = runCliJson([
+      "init",
+      "--cwd",
+      tempProject,
+      "--confirm",
+      "--skip-questions",
+      "--format",
+      "json"
+    ]);
+
+    expect(result.status).toBe(0);
+    expect(result.envelope.ok).toBe(true);
+    expect(result.envelope.command).toBe("init");
+    expect(fs.existsSync(path.join(tempProject, "ai/ai.yaml"))).toBe(true);
+    expect(fs.existsSync(path.join(tempProject, "ai/resolved.yaml"))).toBe(true);
+  });
 });

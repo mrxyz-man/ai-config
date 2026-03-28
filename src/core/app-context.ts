@@ -1,5 +1,6 @@
 import { builtInCommands } from "../commands/builtins";
 import { builtInModules } from "../modules/builtin-modules";
+import { AiConfigInitializer } from "../services/ai-config-initializer";
 import { AiConfigResolver } from "../services/ai-config-resolver";
 import { AiConfigValidator } from "../services/ai-config-validator";
 import { ToolCallingPolicyGate } from "../services/tool-calling-policy";
@@ -18,11 +19,14 @@ const buildFreshAppContext = (): AppContext => {
   const commandRegistry = new CommandRegistry();
   commandRegistry.registerMany(builtInCommands);
 
+  const resolver = new AiConfigResolver();
+
   return {
     commandRegistry,
     moduleRegistry,
+    initializer: new AiConfigInitializer(resolver),
     validator: new AiConfigValidator(),
-    resolver: new AiConfigResolver(),
+    resolver,
     policyGate: new ToolCallingPolicyGate(),
     auditLogger: new YamlAuditLogger()
   };

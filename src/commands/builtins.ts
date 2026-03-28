@@ -66,8 +66,18 @@ export const builtInCommands: CommandDefinition[] = [
         .option("--cwd <path>", "Project root path", ".")
         .option("--format <format>", "Output format: human|json", "human")
         .option("--confirm", "Confirm execution for policy-gated command", false)
+        .option("--force", "Allow re-bootstrap over existing ./ai", false)
+        .option("--lang <code>", "Set questionnaire language")
+        .option("--skip-questions", "Skip interactive questionnaire", false)
         .action(
-          (options: { cwd: string; format: "human" | "json"; confirm?: boolean }) => {
+          (options: {
+            cwd: string;
+            format: "human" | "json";
+            confirm?: boolean;
+            force?: boolean;
+            lang?: string;
+            skipQuestions?: boolean;
+          }) => {
             const targetDir = path.resolve(options.cwd);
             const allowed = applyPolicy({
               context,
@@ -80,15 +90,55 @@ export const builtInCommands: CommandDefinition[] = [
               return;
             }
 
+            const report = context.initializer.init(targetDir, {
+              force: options.force ?? false,
+              lang: options.lang,
+              skipQuestions: options.skipQuestions ?? false
+            });
+            const envelope = createEnvelope({
+              ok: report.ok,
+              command: "init",
+              data: {
+                projectRoot: report.projectRoot,
+                createdFiles: report.createdFiles,
+                updatedFiles: report.updatedFiles,
+                detected: report.detected,
+                unresolvedQuestions: report.unresolvedQuestions
+              },
+              warnings: report.warnings,
+              errors: report.errors
+            });
+
+            emitEnvelope(envelope, options.format);
+            if (options.format === "human") {
+              if (report.ok) {
+                console.log("Init completed.");
+                console.log(`Created: ${report.createdFiles.length} entries`);
+                console.log(`Updated: ${report.updatedFiles.length} entries`);
+                if (report.unresolvedQuestions.length > 0) {
+                  console.log(`Unresolved questions: ${report.unresolvedQuestions.join(", ")}`);
+                }
+              } else {
+                console.error("Init failed.");
+                for (const error of report.errors) {
+                  const location = error.path ? `${error.file}#${error.path}` : error.file;
+                  console.error(`- [ERROR] ${location}: ${error.message}`);
+                }
+              }
+            }
+
             context.auditLogger.append(targetDir, {
               actor: "user",
               command: "init",
               timestamp: new Date().toISOString(),
               decision: "confirmed",
-              outcome: "failed",
-              message: "Not implemented yet"
+              outcome: report.ok ? "success" : "failed",
+              message: report.ok ? undefined : "Init command failed"
             });
-            notImplemented("init");
+
+            if (!report.ok) {
+              process.exitCode = 7;
+            }
           }
         );
     }

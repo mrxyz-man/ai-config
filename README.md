@@ -37,5 +37,5 @@ npm run dev
 
 ## Current Limitations
 
-- `init`, `sync`, and `explain` are policy-aware stubs (not fully implemented yet).
+- `sync` and `explain` are policy-aware stubs (not fully implemented yet).
 - Resolver currently targets baseline v1 behavior and will be extended with richer merge semantics in Sprint 2.
