@@ -5,6 +5,7 @@ paths:
   cli_contracts: "./docs/CLI-CONTRACTS-V1.md"
   implementation_plan: "./docs/IMPLEMENTATION-PLAN-V1.md"
   sprint_tasks: "./docs/SPRINT-1-TASKS.md"
+  singleton_boundaries: "./docs/SINGLETON-BOUNDARIES.md"
   ai_config_root: "./ai"
   custom_area: "./ai/custom"
 

@@ -1,10 +1,4 @@
 tasks:
-  - id: "T6"
-    title: "Define singleton boundaries and anti-pattern guardrails"
-    type: "task"
-    priority: "P1"
-    status: "ready"
-    dependencies: ["T5"]
   - id: "T7"
     title: "Implement first vertical slice: resolve + validate (minimal)"
     type: "task"

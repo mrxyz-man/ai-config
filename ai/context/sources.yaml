@@ -4,6 +4,7 @@ priority_sources:
   - "docs/CLI-CONTRACTS-V1.md"
   - "docs/IMPLEMENTATION-PLAN-V1.md"
   - "docs/SPRINT-1-TASKS.md"
+  - "docs/SINGLETON-BOUNDARIES.md"
   - "ai/**"
 
 fallback_sources:

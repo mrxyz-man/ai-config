@@ -16,5 +16,6 @@ allowlist_overrides:
   - "docs/CLI-CONTRACTS-V1.md"
   - "docs/IMPLEMENTATION-PLAN-V1.md"
   - "docs/SPRINT-1-TASKS.md"
+  - "docs/SINGLETON-BOUNDARIES.md"
   - "docs/**"
   - "ai/**"
