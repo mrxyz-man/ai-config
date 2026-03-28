@@ -1,10 +1,4 @@
 tasks:
-  - id: "T7"
-    title: "Implement first vertical slice: resolve + validate (minimal)"
-    type: "task"
-    priority: "P0"
-    status: "ready"
-    dependencies: ["T4", "T5"]
   - id: "T8"
     title: "Add tool-calling policy and audit hooks"
     type: "task"

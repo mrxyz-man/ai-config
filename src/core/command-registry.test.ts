@@ -22,7 +22,17 @@ describe("CommandRegistry", () => {
 
     registry.apply(program, {
       moduleRegistry: new ModuleRegistry(),
-      resolver: { resolve: () => undefined },
+      resolver: {
+        resolve: () => ({
+          ok: true,
+          outputFile: "ai/resolved.yaml",
+          resolved: null,
+          resolvedModules: [],
+          checksum: null,
+          warnings: [],
+          errors: []
+        })
+      },
       validator: {
         validate: () => ({
           ok: true,
@@ -49,4 +59,3 @@ describe("CommandRegistry", () => {
     expect(() => registry.register(command)).toThrow('Command "dup" is already registered');
   });
 });
-

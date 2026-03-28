@@ -1,10 +1,9 @@
-generated_at: "2026-03-28"
-status: "draft_v1"
+generated_at: null
+status: resolved_v1
 profile:
-  project_id: "ai-config"
-  language: "ru"
-  timezone: "Asia/Yekaterinburg"
-
+  project_id: ai-config
+  language: ru
+  timezone: Asia/Yekaterinburg
 active_modules:
   - project
   - context
@@ -16,14 +15,12 @@ active_modules:
   - instructions
   - custom
   - state
-
 execution:
-  mode: "tool-calling"
-  policy: "balanced"
+  mode: tool-calling
+  policy: balanced
   require_confirmation_for_mutations: true
-
 agent_roles:
-  default: "developer"
+  default: developer
   enabled:
     - architect
     - developer
@@ -32,10 +29,9 @@ agent_roles:
     - architect
     - developer
     - reviewer
-
 tasks:
   enabled: true
-  mode: "local"
+  mode: local
   always_offer_task_creation: true
   epic_auto_decomposition: true
   statuses:
@@ -44,17 +40,17 @@ tasks:
     - in_progress
     - review
     - done
-
 text:
-  default_encoding: "utf-8"
+  default_encoding: utf-8
   enforce_utf8: true
   require_readable_cyrillic: true
-  language_policy: "match_user_language"
-
+  language_policy: match_user_language
 context_priorities:
-  - "docs/AI-CONFIG-SYSTEM-SPEC.md"
-  - "docs/PRE-DEV-CHECKLIST.md"
-  - "docs/CLI-CONTRACTS-V1.md"
-  - "ai/**"
-
-note: "Draft resolved snapshot. Final output should be produced by resolver command."
+  - docs/AI-CONFIG-SYSTEM-SPEC.md
+  - docs/PRE-DEV-CHECKLIST.md
+  - docs/CLI-CONTRACTS-V1.md
+  - docs/IMPLEMENTATION-PLAN-V1.md
+  - docs/SPRINT-1-TASKS.md
+  - docs/SINGLETON-BOUNDARIES.md
+  - ai/**
+note: Resolved by ai-config resolver v1
