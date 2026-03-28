@@ -65,6 +65,42 @@ describe("CLI contract + e2e smoke", () => {
     expect(result.envelope.errors.length).toBeGreaterThan(0);
   });
 
+  it("validate supports scope and returns scoped data", () => {
+    const tempProject = createTempProjectWithAiConfig();
+    const result = runCliJson([
+      "validate",
+      "--cwd",
+      tempProject,
+      "--scope",
+      "tasks",
+      "--format",
+      "json"
+    ]);
+
+    expect(result.status).toBe(0);
+    expect(result.envelope.ok).toBe(true);
+    expect(result.envelope.command).toBe("validate");
+    expect(result.envelope.data.scope).toBe("tasks");
+    expect(Array.isArray(result.envelope.data.validatedFiles)).toBe(true);
+  });
+
+  it("validate returns exit code 2 for invalid scope", () => {
+    const tempProject = createTempProjectWithAiConfig();
+    const result = runCliJson([
+      "validate",
+      "--cwd",
+      tempProject,
+      "--scope",
+      "invalid",
+      "--format",
+      "json"
+    ]);
+
+    expect(result.status).toBe(2);
+    expect(result.envelope.ok).toBe(false);
+    expect(result.envelope.command).toBe("validate");
+  });
+
   it("resolve returns v1 JSON envelope and writes resolved file", () => {
     const tempProject = createTempProjectWithAiConfig();
     const result = runCliJson(["resolve", "--cwd", tempProject, "--format", "json"]);

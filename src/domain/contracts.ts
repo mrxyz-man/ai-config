@@ -137,6 +137,15 @@ export const ContextSourcesSchema = z.object({
     .optional()
 });
 
+export const QuestionsConfigSchema = z.object({
+  enabled: z.boolean(),
+  language_detection: z.object({
+    mode: z.string().min(1),
+    fallback: z.string().min(1)
+  }),
+  required_blocks: z.array(z.string().min(1)).min(1)
+});
+
 export type AiConfig = z.infer<typeof AiConfigSchema>;
 export type ModulesConfig = z.infer<typeof ModulesConfigSchema>;
 export type ProjectConfig = z.infer<typeof ProjectConfigSchema>;
@@ -147,3 +156,4 @@ export type TasksConfig = z.infer<typeof TasksConfigSchema>;
 export type TextEncoding = z.infer<typeof TextEncodingSchema>;
 export type TextLocale = z.infer<typeof TextLocaleSchema>;
 export type ContextSources = z.infer<typeof ContextSourcesSchema>;
+export type QuestionsConfig = z.infer<typeof QuestionsConfigSchema>;

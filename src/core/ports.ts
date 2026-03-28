@@ -6,13 +6,17 @@ export type ValidationIssue = {
 
 export type ValidationReport = {
   ok: boolean;
+  scope: "all" | "schemas" | "rules" | "text" | "tasks" | "questions";
   validatedFiles: string[];
   errors: ValidationIssue[];
   warnings: ValidationIssue[];
 };
 
 export interface ConfigValidatorPort {
-  validate(projectRoot: string): ValidationReport;
+  validate(
+    projectRoot: string,
+    options?: { scope?: "all" | "schemas" | "rules" | "text" | "tasks" | "questions" }
+  ): ValidationReport;
 }
 
 export type ResolveIssue = {

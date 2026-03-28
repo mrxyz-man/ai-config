@@ -20,6 +20,7 @@ describe("validateAiConfigContracts", () => {
     const report = validateAiConfigContracts(projectRoot);
 
     expect(report.ok).toBe(true);
+    expect(report.scope).toBe("all");
     expect(report.errors).toHaveLength(0);
     expect(report.validatedFiles).toEqual(
       expect.arrayContaining([
@@ -53,5 +54,60 @@ describe("validateAiConfigContracts", () => {
     expect(report.ok).toBe(false);
     expect(report.errors.some((error) => error.file === "ai/modules.yaml")).toBe(true);
   });
-});
 
+  it("validates only tasks scope and catches missing required status", () => {
+    const projectRoot = createTempProject();
+    fs.writeFileSync(
+      path.join(projectRoot, "ai/tasks/config.yaml"),
+      [
+        "enabled: true",
+        'mode: "local"',
+        "always_offer_task_creation: true",
+        "epic_auto_decomposition: true",
+        "statuses:",
+        "  - inbox",
+        "  - ready",
+        "  - review",
+        "  - done",
+        "required_fields:",
+        "  - title",
+        "  - type",
+        "  - description"
+      ].join("\n"),
+      "utf8"
+    );
+
+    const report = validateAiConfigContracts(projectRoot, { scope: "tasks" });
+
+    expect(report.scope).toBe("tasks");
+    expect(report.ok).toBe(false);
+    expect(report.errors.some((error) => error.message.includes("Missing required task status"))).toBe(
+      true
+    );
+    expect(report.validatedFiles).toEqual(["ai/tasks/config.yaml"]);
+  });
+
+  it("validates only text scope and catches utf-8 mismatch", () => {
+    const projectRoot = createTempProject();
+    fs.writeFileSync(
+      path.join(projectRoot, "ai/text/encoding.yaml"),
+      [
+        'default_encoding: "windows-1251"',
+        "enforce_utf8: true",
+        "reject_unknown_encoding: true",
+        "mojibake_signals:",
+        '  - "Гђ"'
+      ].join("\n"),
+      "utf8"
+    );
+
+    const report = validateAiConfigContracts(projectRoot, { scope: "text" });
+
+    expect(report.scope).toBe("text");
+    expect(report.ok).toBe(false);
+    expect(report.errors.some((error) => error.path === "default_encoding")).toBe(true);
+    expect(report.validatedFiles).toEqual(
+      expect.arrayContaining(["ai/text/encoding.yaml", "ai/text/locale.yaml"])
+    );
+  });
+});

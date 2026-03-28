@@ -332,12 +332,18 @@ export const builtInCommands: CommandDefinition[] = [
         .description("Run configuration validation")
         .option("--cwd <path>", "Project root path", ".")
         .option("--format <format>", "Output format: human|json", "human")
+        .option(
+          "--scope <scope>",
+          "Validation scope: all|schemas|rules|text|tasks|questions",
+          "all"
+        )
         .option("--strict", "Treat warnings as failures", false)
         .option("--confirm", "Confirm execution for policy-gated command", false)
         .action(
           (options: {
             cwd: string;
             format: "human" | "json";
+            scope?: "all" | "schemas" | "rules" | "text" | "tasks" | "questions";
             strict?: boolean;
             confirm?: boolean;
           }) => {
@@ -353,13 +359,32 @@ export const builtInCommands: CommandDefinition[] = [
               return;
             }
 
-            const report = context.validator.validate(targetDir);
+            const validScopes = ["all", "schemas", "rules", "text", "tasks", "questions"];
+            if (options.scope && !validScopes.includes(options.scope)) {
+              const envelope = createEnvelope({
+                ok: false,
+                command: "validate",
+                data: {
+                  providedScope: options.scope
+                },
+                warnings: [],
+                errors: [{ message: `Invalid scope "${options.scope}"` }]
+              });
+              emitEnvelope(envelope, options.format);
+              process.exitCode = 2;
+              return;
+            }
+
+            const report = context.validator.validate(targetDir, {
+              scope: options.scope ?? "all"
+            });
             const strictFailed = options.strict === true && report.warnings.length > 0;
             const ok = report.ok && !strictFailed;
             const envelope = createEnvelope({
               ok,
               command: "validate",
               data: {
+                scope: report.scope,
                 validatedFiles: report.validatedFiles,
                 warningCount: report.warnings.length,
                 errorCount: report.errors.length

@@ -80,6 +80,7 @@ describe("CommandRegistry", () => {
       },
       validator: {
         validate: () => ({
+          scope: "all",
           ok: true,
           validatedFiles: [],
           errors: [],
