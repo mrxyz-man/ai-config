@@ -209,6 +209,30 @@ describe("CLI contract + e2e smoke", () => {
     expect(mcpFile).toContain('provider: gitlab');
   });
 
+  it("mcp connect custom with --confirm updates integration config", () => {
+    const tempProject = createTempProjectWithAiConfig();
+    const result = runCliJson([
+      "mcp",
+      "connect",
+      "custom",
+      "--cwd",
+      tempProject,
+      "--confirm",
+      "--mode",
+      "hybrid",
+      "--format",
+      "json"
+    ]);
+
+    expect(result.status).toBe(0);
+    expect(result.envelope.ok).toBe(true);
+    expect(result.envelope.command).toBe("mcp connect");
+    expect(result.envelope.data.provider).toBe("custom");
+    const mcpFile = fs.readFileSync(path.join(tempProject, "ai/tasks/integrations/mcp.yaml"), "utf8");
+    expect(mcpFile).toContain("enabled: true");
+    expect(mcpFile).toContain('provider: custom');
+  });
+
   it("tasks list returns JSON envelope", () => {
     const tempProject = createTempProjectWithAiConfig();
     const result = runCliJson(["tasks", "list", "--cwd", tempProject, "--format", "json"]);

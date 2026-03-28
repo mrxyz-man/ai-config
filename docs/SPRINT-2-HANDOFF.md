@@ -52,7 +52,7 @@
   - `questions run [--lang]`
 - MCP:
   - `mcp status`
-  - `mcp connect gitlab [--mode local|hybrid|remote-first]`
+  - `mcp connect <provider> [--mode local|hybrid|remote-first]`
   - `mcp disconnect`
 
 ## Quality Gate Status

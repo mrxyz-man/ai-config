@@ -61,6 +61,21 @@ describe("TaskMcpIntegrationService", () => {
     expect(tasksYaml.mode).toBe("local");
   });
 
+  it("connects custom provider for user-managed MCP strategy", () => {
+    const projectRoot = createTempProject();
+    const service = new TaskMcpIntegrationService();
+
+    const report = service.connect(projectRoot, { provider: "custom", mode: "hybrid" });
+
+    expect(report.ok).toBe(true);
+    expect(report.provider).toBe("custom");
+    const mcpYaml = YAML.parse(
+      fs.readFileSync(path.join(projectRoot, "ai/tasks/integrations/mcp.yaml"), "utf8")
+    ) as { provider: string | null; enabled: boolean };
+    expect(mcpYaml.enabled).toBe(true);
+    expect(mcpYaml.provider).toBe("custom");
+  });
+
   it("returns no-op sync warning when provider is not connected", () => {
     const projectRoot = createTempProject();
     const service = new TaskMcpIntegrationService();

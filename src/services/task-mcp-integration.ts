@@ -27,7 +27,7 @@ const TaskConfigSchema = z.object({
 
 const McpConfigSchema = z.object({
   enabled: z.boolean(),
-  provider: z.enum(["gitlab"]).nullable(),
+  provider: z.enum(["gitlab", "custom"]).nullable(),
   mode: z.enum(["local", "hybrid", "remote-first"]),
   sync_direction: z.enum(["none", "push", "pull", "bidirectional"]),
   notes: z.string().optional()
@@ -72,6 +72,28 @@ class GitLabMcpProvider implements TaskMcpProvider {
     return {
       ok: false,
       message: "GitLab sync skeleton is not implemented yet"
+    };
+  }
+}
+
+class CustomMcpProvider implements TaskMcpProvider {
+  readonly name: McpProviderName = "custom";
+
+  health(projectRoot: string, config: McpConfig): ProviderHealth {
+    void projectRoot;
+    void config;
+    return {
+      ok: true,
+      message: "Custom MCP provider is managed by user configuration"
+    };
+  }
+
+  sync(projectRoot: string, config: McpConfig): ProviderHealth {
+    void projectRoot;
+    void config;
+    return {
+      ok: true,
+      message: "Custom MCP sync delegated to user-managed provider"
     };
   }
 }
@@ -124,7 +146,7 @@ const buildErrorReport = (
 export class TaskMcpIntegrationService implements TaskMcpIntegrationPort {
   private readonly providers: Map<McpProviderName, TaskMcpProvider>;
 
-  constructor(providers: TaskMcpProvider[] = [new GitLabMcpProvider()]) {
+  constructor(providers: TaskMcpProvider[] = [new GitLabMcpProvider(), new CustomMcpProvider()]) {
     this.providers = new Map(providers.map((provider) => [provider.name, provider]));
   }
 
@@ -197,7 +219,10 @@ export class TaskMcpIntegrationService implements TaskMcpIntegrationPort {
         provider: input.provider,
         mode: nextMode,
         sync_direction: nextDirection,
-        notes: "Connected via MCP integration service v1 skeleton"
+        notes:
+          input.provider === "gitlab"
+            ? "Connected via MCP integration service v1 skeleton"
+            : "Connected custom provider (external user-managed MCP)"
       };
 
       const tasksAbsolutePath = path.join(projectRoot, TASKS_CONFIG_PATH);
