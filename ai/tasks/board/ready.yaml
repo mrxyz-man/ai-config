@@ -1,10 +1,4 @@
 tasks:
-  - id: "T9"
-    title: "Add test baseline (unit + contract + e2e smoke)"
-    type: "task"
-    priority: "P0"
-    status: "ready"
-    dependencies: ["T7"]
   - id: "T10"
     title: "Sprint hardening, docs sync, and handoff"
     type: "task"
