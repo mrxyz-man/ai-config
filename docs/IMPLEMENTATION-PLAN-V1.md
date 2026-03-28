@@ -1,5 +1,14 @@
 # ai-config Implementation Plan v1
 
+## Status Snapshot (2026-03-28)
+
+- M1: completed
+- M2: completed
+- M3: completed
+- M4: completed
+- M5: completed
+- M6: in progress (docs alignment and release preparation)
+
 ## 1. Objective
 
 Implement a stable MVP based on:
@@ -8,7 +17,9 @@ Implement a stable MVP based on:
 - current `./ai` bootstrap baseline
 
 Primary deliverable:
-- production-ready v1 CLI flow for `init`, `sync`, `resolve`, `validate`, `explain`
+- production-ready v1 CLI flow for core + module commands
+  - core: `init|sync|resolve|validate|explain`
+  - modules: `tasks`, `text`, `questions`, `mcp` prep
 
 ---
 
@@ -223,4 +234,3 @@ Start implementation when:
 - owners assigned per milestone.
 - fixture strategy agreed.
 - test gate baseline agreed.
-

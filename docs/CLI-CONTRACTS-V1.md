@@ -2,12 +2,12 @@
 
 ## 1. Scope
 
-This document defines implementation contracts for mandatory v1 commands:
-- `init`
-- `sync`
-- `resolve`
-- `validate`
-- `explain`
+This document defines implementation contracts for v1 commands:
+- Core: `init`, `sync`, `resolve`, `validate`, `explain`
+- Tasks: `tasks enable|disable|intake|list|sync`
+- Text: `text check`
+- Questions: `questions status|run`
+- MCP prep: `mcp status|connect|disconnect`
 
 Design goals:
 - deterministic behavior
@@ -271,8 +271,24 @@ May append audit event:
 ## 9. Tool-Calling Alignment (v1)
 
 Execution mode mapping:
-- Auto-run: `resolve`, `validate`, `explain`
-- Confirm-required: `init`, `sync`
+- Auto-run:
+  - `resolve`
+  - `validate`
+  - `explain`
+  - `mcp status`
+  - `tasks intake`
+  - `tasks list`
+  - `text check`
+  - `questions status`
+- Confirm-required:
+  - `init`
+  - `sync`
+  - `mcp connect`
+  - `mcp disconnect`
+  - `tasks sync`
+  - `tasks enable`
+  - `tasks disable`
+  - `questions run`
 
 Any policy decision should be reflected in:
 - command output (`data.policy_decision`)
@@ -280,7 +296,60 @@ Any policy decision should be reflected in:
 
 ---
 
-## 10. Definition of Done for CLI v1 Contracts
+## 10. Module Command Contracts (v1)
+
+### 10.1 `ai-config tasks enable|disable`
+
+- Purpose: toggle task-first workflow in `ai/tasks/config.yaml`.
+- Side effects: updates `ai/tasks/config.yaml`, appends audit event.
+- Policy: confirm-required.
+
+### 10.2 `ai-config tasks intake "<text>"`
+
+- Purpose: convert user text into structured task and store in local board (`inbox`).
+- Side effects: updates `ai/tasks/board/inbox.yaml`, appends audit event.
+- Policy: auto-run.
+
+### 10.3 `ai-config tasks list [--status]`
+
+- Purpose: list tasks from local board, optionally filtered by status.
+- Side effects: none (besides audit).
+- Policy: auto-run.
+
+### 10.4 `ai-config tasks sync`
+
+- Purpose: run MCP-backed task sync using configured provider.
+- Side effects: provider-dependent (currently skeleton/no-op sync), audit append.
+- Policy: confirm-required.
+
+### 10.5 `ai-config text check`
+
+- Purpose: run mojibake/encoding/cyrillic readability checks against `./ai` text sources.
+- Side effects: none (besides audit).
+- Policy: auto-run.
+
+### 10.6 `ai-config questions status`
+
+- Purpose: show questionnaire completion and missing required blocks.
+- Side effects: none (besides audit).
+- Policy: auto-run.
+
+### 10.7 `ai-config questions run [--lang]`
+
+- Purpose: run questionnaire lifecycle update and persist language/completion state.
+- Side effects: updates `ai/questions/answers.yaml`, appends audit event.
+- Policy: confirm-required.
+
+### 10.8 `ai-config mcp status|connect|disconnect`
+
+- `status`: read integration status and provider health hints (auto-run).
+- `connect`: enable provider + set mode/sync direction (confirm-required).
+- `disconnect`: disable provider + reset local mode (confirm-required).
+- Side effects for mutating commands: updates `ai/tasks/config.yaml` and `ai/tasks/integrations/mcp.yaml`, appends audit event.
+
+---
+
+## 11. Definition of Done for CLI v1 Contracts
 
 Contract is considered implementation-ready when:
 - command signatures are frozen
@@ -288,4 +357,3 @@ Contract is considered implementation-ready when:
 - side effects per command are frozen
 - non-interactive failure rules are frozen
 - tool-calling policy mapping is frozen
-

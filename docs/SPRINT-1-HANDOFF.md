@@ -1,5 +1,7 @@
 # Sprint 1 Handoff
 
+Note: This file captures the Sprint 1 baseline only. Current implementation status is documented in `docs/SPRINT-2-HANDOFF.md`.
+
 ## Delivered
 
 - Foundation project setup with Node 24 + npm 11 constraints.
@@ -48,4 +50,3 @@ npm run dev -- sync --format json      # expected policy block without --confirm
 - Command and module expansion should be done via registries, not by editing dispatcher branching.
 - Singleton policy and test reset behavior are defined in `docs/SINGLETON-BOUNDARIES.md`.
 - Prefer adding new runtime behavior behind service ports to keep CLI wiring stable.
-
