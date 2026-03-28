@@ -29,3 +29,13 @@ npm run dev
 - Core service contracts are isolated as ports (`src/core/ports.ts`), so resolver/validator implementations can evolve without rewriting CLI wiring.
 - Singleton boundaries are explicitly defined in [docs/SINGLETON-BOUNDARIES.md](./docs/SINGLETON-BOUNDARIES.md), including test reset hooks.
 - Tool-calling policy and audit hooks are enforced through dedicated services (`ToolCallingPolicyGate`, `YamlAuditLogger`).
+
+## Sprint Status
+
+- Sprint 1 handoff: [docs/SPRINT-1-HANDOFF.md](./docs/SPRINT-1-HANDOFF.md)
+- Sprint 2 proposed backlog: [docs/SPRINT-2-BACKLOG.md](./docs/SPRINT-2-BACKLOG.md)
+
+## Current Limitations
+
+- `init`, `sync`, and `explain` are policy-aware stubs (not fully implemented yet).
+- Resolver currently targets baseline v1 behavior and will be extended with richer merge semantics in Sprint 2.

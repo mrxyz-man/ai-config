@@ -17,5 +17,7 @@ allowlist_overrides:
   - "docs/IMPLEMENTATION-PLAN-V1.md"
   - "docs/SPRINT-1-TASKS.md"
   - "docs/SINGLETON-BOUNDARIES.md"
+  - "docs/SPRINT-1-HANDOFF.md"
+  - "docs/SPRINT-2-BACKLOG.md"
   - "docs/**"
   - "ai/**"
