@@ -15,6 +15,18 @@ import {
 
 const TASKS_CONFIG_PATH = "ai/tasks/config.yaml";
 const MCP_CONFIG_PATH = "ai/tasks/integrations/mcp.yaml";
+const TASKS_BOARD_DIR = "ai/tasks/board";
+const DEFAULT_EXTERNAL_BOARD_PATH = "ai/tasks/integrations/custom-board.yaml";
+
+const STATUS_FILE_MAP = {
+  inbox: "inbox.yaml",
+  ready: "ready.yaml",
+  in_progress: "in-progress.yaml",
+  review: "review.yaml",
+  done: "done.yaml"
+} as const;
+
+const TASK_STATUSES = Object.keys(STATUS_FILE_MAP) as Array<keyof typeof STATUS_FILE_MAP>;
 
 const TaskConfigSchema = z.object({
   enabled: z.boolean(),
@@ -43,6 +55,29 @@ type ProviderHealth = {
   capabilities: string[];
   message: string;
 };
+
+const SyncTaskSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  type: z.enum(["task", "bug", "epic"]).default("task"),
+  priority: z.enum(["P0", "P1", "P2", "P3"]).default("P2"),
+  status: z.enum(["inbox", "ready", "in_progress", "review", "done"]).default("inbox"),
+  description: z.string().default(""),
+  acceptance_criteria: z.array(z.string()).default([]),
+  risks: z.array(z.string()).default([]),
+  dependencies: z.array(z.string()).default([]),
+  owner_role: z.string().optional(),
+  estimate: z.string().optional(),
+  created_at: z.string().default(() => new Date().toISOString()),
+  updated_at: z.string().optional(),
+  source: z.string().optional()
+});
+
+type SyncTask = z.infer<typeof SyncTaskSchema>;
+
+const TasksBoardFileSchema = z.object({
+  tasks: z.array(SyncTaskSchema).default([])
+});
 
 interface TaskMcpProvider {
   readonly name: McpProviderName;
@@ -84,6 +119,9 @@ const parseYamlFile = (absolutePath: string): unknown => {
   return YAML.parse(raw);
 };
 
+const toRelative = (projectRoot: string, absolutePath: string): string =>
+  path.relative(projectRoot, absolutePath).replace(/\\/g, "/");
+
 const readTaskConfig = (projectRoot: string): TaskConfig => {
   const absolutePath = path.join(projectRoot, TASKS_CONFIG_PATH);
   const parsed = parseYamlFile(absolutePath);
@@ -94,6 +132,154 @@ const readMcpConfig = (projectRoot: string): McpConfig => {
   const absolutePath = path.join(projectRoot, MCP_CONFIG_PATH);
   const parsed = parseYamlFile(absolutePath);
   return McpConfigSchema.parse(parsed);
+};
+
+const readLocalBoardByStatus = (
+  projectRoot: string
+): Record<keyof typeof STATUS_FILE_MAP, SyncTask[]> => {
+  const byStatus = {
+    inbox: [] as SyncTask[],
+    ready: [] as SyncTask[],
+    in_progress: [] as SyncTask[],
+    review: [] as SyncTask[],
+    done: [] as SyncTask[]
+  };
+
+  for (const status of TASK_STATUSES) {
+    const absolutePath = path.join(projectRoot, TASKS_BOARD_DIR, STATUS_FILE_MAP[status]);
+    if (!fs.existsSync(absolutePath)) {
+      continue;
+    }
+    try {
+      const parsed = TasksBoardFileSchema.safeParse(parseYamlFile(absolutePath));
+      if (!parsed.success) {
+        continue;
+      }
+      byStatus[status] = parsed.data.tasks.map((task) => ({
+        ...task,
+        status
+      }));
+    } catch {
+      continue;
+    }
+  }
+
+  return byStatus;
+};
+
+const writeLocalBoardByStatus = (
+  projectRoot: string,
+  byStatus: Record<keyof typeof STATUS_FILE_MAP, SyncTask[]>
+): string[] => {
+  const updatedFiles: string[] = [];
+  for (const status of TASK_STATUSES) {
+    const absolutePath = path.join(projectRoot, TASKS_BOARD_DIR, STATUS_FILE_MAP[status]);
+    const payload = {
+      tasks: byStatus[status].map((task) => {
+        const { updated_at, ...rest } = task;
+        return updated_at ? { ...rest, updated_at } : rest;
+      })
+    };
+    writeYamlAtomic(absolutePath, payload);
+    updatedFiles.push(toRelative(projectRoot, absolutePath));
+  }
+  return updatedFiles;
+};
+
+const flattenByStatus = (
+  byStatus: Record<keyof typeof STATUS_FILE_MAP, SyncTask[]>
+): SyncTask[] => TASK_STATUSES.flatMap((status) => byStatus[status]);
+
+const readExternalTasks = (projectRoot: string, mcpConfig: McpConfig): SyncTask[] => {
+  const externalRelativePath =
+    typeof mcpConfig.provider_config.external_board_file === "string"
+      ? mcpConfig.provider_config.external_board_file
+      : DEFAULT_EXTERNAL_BOARD_PATH;
+  const absolutePath = path.join(projectRoot, externalRelativePath);
+  if (!fs.existsSync(absolutePath)) {
+    return [];
+  }
+  const parsed = TasksBoardFileSchema.safeParse(parseYamlFile(absolutePath));
+  if (!parsed.success) {
+    return [];
+  }
+  return parsed.data.tasks;
+};
+
+const writeExternalTasks = (
+  projectRoot: string,
+  mcpConfig: McpConfig,
+  tasks: SyncTask[]
+): string => {
+  const externalRelativePath =
+    typeof mcpConfig.provider_config.external_board_file === "string"
+      ? mcpConfig.provider_config.external_board_file
+      : DEFAULT_EXTERNAL_BOARD_PATH;
+  const absolutePath = path.join(projectRoot, externalRelativePath);
+  writeYamlAtomic(absolutePath, { tasks });
+  return toRelative(projectRoot, absolutePath);
+};
+
+const taskTimestamp = (task: SyncTask): number => {
+  const source = task.updated_at ?? task.created_at;
+  const value = Date.parse(source);
+  return Number.isNaN(value) ? 0 : value;
+};
+
+const mergeTasksBidirectional = (
+  localTasks: SyncTask[],
+  externalTasks: SyncTask[]
+): { merged: SyncTask[]; conflicts: string[] } => {
+  const conflicts: string[] = [];
+  const localMap = new Map(localTasks.map((task) => [task.id, task]));
+  const externalMap = new Map(externalTasks.map((task) => [task.id, task]));
+  const ids = new Set([...localMap.keys(), ...externalMap.keys()]);
+  const merged: SyncTask[] = [];
+
+  for (const id of ids) {
+    const local = localMap.get(id);
+    const external = externalMap.get(id);
+    if (!local && external) {
+      merged.push(external);
+      continue;
+    }
+    if (!external && local) {
+      merged.push(local);
+      continue;
+    }
+    if (!local || !external) {
+      continue;
+    }
+
+    const localSerialized = JSON.stringify(local);
+    const externalSerialized = JSON.stringify(external);
+    if (localSerialized === externalSerialized) {
+      merged.push(local);
+      continue;
+    }
+
+    const resolved = taskTimestamp(local) >= taskTimestamp(external) ? local : external;
+    conflicts.push(
+      `Conflict resolved for task "${id}" using latest timestamp (${resolved === local ? "local" : "external"})`
+    );
+    merged.push(resolved);
+  }
+
+  return { merged, conflicts };
+};
+
+const groupByStatus = (tasks: SyncTask[]): Record<keyof typeof STATUS_FILE_MAP, SyncTask[]> => {
+  const grouped = {
+    inbox: [] as SyncTask[],
+    ready: [] as SyncTask[],
+    in_progress: [] as SyncTask[],
+    review: [] as SyncTask[],
+    done: [] as SyncTask[]
+  };
+  for (const task of tasks) {
+    grouped[task.status].push(task);
+  }
+  return grouped;
 };
 
 const writeYamlAtomic = (absolutePath: string, value: unknown): void => {
@@ -325,29 +511,53 @@ export class TaskMcpIntegrationService implements TaskMcpIntegrationPort {
         };
       }
 
+      const localByStatus = readLocalBoardByStatus(projectRoot);
+      const localTasks = flattenByStatus(localByStatus);
+      const externalTasks = readExternalTasks(projectRoot, mcpConfig);
+      const warnings: McpIntegrationMutationReport["warnings"] = [];
+      const errors: McpIntegrationMutationReport["errors"] = [];
+      const updatedFiles: string[] = [];
+
+      if (mcpConfig.sync_direction === "pull") {
+        const grouped = groupByStatus(externalTasks);
+        updatedFiles.push(...writeLocalBoardByStatus(projectRoot, grouped));
+      } else if (mcpConfig.sync_direction === "push") {
+        updatedFiles.push(writeExternalTasks(projectRoot, mcpConfig, localTasks));
+      } else if (mcpConfig.sync_direction === "bidirectional") {
+        const { merged, conflicts } = mergeTasksBidirectional(localTasks, externalTasks);
+        const grouped = groupByStatus(merged);
+        updatedFiles.push(...writeLocalBoardByStatus(projectRoot, grouped));
+        updatedFiles.push(writeExternalTasks(projectRoot, mcpConfig, merged));
+        warnings.push(
+          ...conflicts.map((message) => ({
+            file: MCP_CONFIG_PATH,
+            message
+          }))
+        );
+      } else {
+        warnings.push({
+          file: MCP_CONFIG_PATH,
+          path: "sync_direction",
+          message: "sync_direction is none; sync skipped"
+        });
+      }
+
       const syncResult = provider.sync(projectRoot, mcpConfig);
+      if (!syncResult.ok) {
+        errors.push({
+          file: MCP_CONFIG_PATH,
+          message: syncResult.message
+        });
+      }
+
       return {
-        ok: syncResult.ok,
+        ok: errors.length === 0,
         provider: mcpConfig.provider,
         mode: mcpConfig.mode,
         syncDirection: mcpConfig.sync_direction,
-        updatedFiles: [],
-        warnings: syncResult.ok
-          ? []
-          : [
-            {
-              file: MCP_CONFIG_PATH,
-              message: syncResult.message
-            }
-          ],
-        errors: syncResult.ok
-          ? []
-          : [
-            {
-              file: MCP_CONFIG_PATH,
-              message: syncResult.message
-            }
-          ]
+        updatedFiles,
+        warnings,
+        errors
       };
     } catch (error) {
       return {

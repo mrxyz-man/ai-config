@@ -16,6 +16,13 @@ const createTempProject = (): string => {
 };
 
 describe("TaskMcpIntegrationService", () => {
+  const mcpConfigPath = (projectRoot: string): string =>
+    path.join(projectRoot, "ai/tasks/integrations/mcp.yaml");
+  const inboxPath = (projectRoot: string): string =>
+    path.join(projectRoot, "ai/tasks/board/inbox.yaml");
+  const externalBoardPath = (projectRoot: string): string =>
+    path.join(projectRoot, "ai/tasks/integrations/custom-board.yaml");
+
   it("returns current mcp status", () => {
     const projectRoot = createTempProject();
     const service = new TaskMcpIntegrationService();
@@ -99,5 +106,152 @@ describe("TaskMcpIntegrationService", () => {
     expect(report.ok).toBe(true);
     expect(report.errors).toHaveLength(0);
     expect(report.warnings[0]?.message).toContain("Sync skipped");
+  });
+
+  it("sync push writes local tasks into external board", () => {
+    const projectRoot = createTempProject();
+    const service = new TaskMcpIntegrationService();
+    service.connect(projectRoot, { provider: "custom", mode: "hybrid" });
+    const mcpConfig = YAML.parse(fs.readFileSync(mcpConfigPath(projectRoot), "utf8")) as Record<
+      string,
+      unknown
+    >;
+    mcpConfig.sync_direction = "push";
+    fs.writeFileSync(mcpConfigPath(projectRoot), YAML.stringify(mcpConfig), "utf8");
+
+    fs.writeFileSync(
+      inboxPath(projectRoot),
+      YAML.stringify({
+        tasks: [
+          {
+            id: "T100",
+            title: "Push Task",
+            type: "task",
+            priority: "P1",
+            status: "inbox",
+            description: "From local board",
+            acceptance_criteria: [],
+            risks: [],
+            dependencies: [],
+            created_at: "2026-03-29T00:00:00.000Z"
+          }
+        ]
+      }),
+      "utf8"
+    );
+
+    const report = service.sync(projectRoot);
+    const external = YAML.parse(fs.readFileSync(externalBoardPath(projectRoot), "utf8")) as {
+      tasks: Array<{ id: string }>;
+    };
+
+    expect(report.ok).toBe(true);
+    expect(external.tasks.some((task) => task.id === "T100")).toBe(true);
+  });
+
+  it("sync pull imports external tasks into local board", () => {
+    const projectRoot = createTempProject();
+    const service = new TaskMcpIntegrationService();
+    service.connect(projectRoot, { provider: "custom", mode: "hybrid" });
+    const mcpConfig = YAML.parse(fs.readFileSync(mcpConfigPath(projectRoot), "utf8")) as Record<
+      string,
+      unknown
+    >;
+    mcpConfig.sync_direction = "pull";
+    fs.writeFileSync(mcpConfigPath(projectRoot), YAML.stringify(mcpConfig), "utf8");
+
+    fs.writeFileSync(
+      externalBoardPath(projectRoot),
+      YAML.stringify({
+        tasks: [
+          {
+            id: "T200",
+            title: "External Task",
+            type: "task",
+            priority: "P2",
+            status: "inbox",
+            description: "From external board",
+            acceptance_criteria: [],
+            risks: [],
+            dependencies: [],
+            created_at: "2026-03-29T00:00:00.000Z"
+          }
+        ]
+      }),
+      "utf8"
+    );
+
+    const report = service.sync(projectRoot);
+    const inbox = YAML.parse(fs.readFileSync(inboxPath(projectRoot), "utf8")) as {
+      tasks: Array<{ id: string }>;
+    };
+
+    expect(report.ok).toBe(true);
+    expect(inbox.tasks.some((task) => task.id === "T200")).toBe(true);
+  });
+
+  it("sync bidirectional merges tasks and emits conflict warning", () => {
+    const projectRoot = createTempProject();
+    const service = new TaskMcpIntegrationService();
+    service.connect(projectRoot, { provider: "custom", mode: "hybrid" });
+    const mcpConfig = YAML.parse(fs.readFileSync(mcpConfigPath(projectRoot), "utf8")) as Record<
+      string,
+      unknown
+    >;
+    mcpConfig.sync_direction = "bidirectional";
+    fs.writeFileSync(mcpConfigPath(projectRoot), YAML.stringify(mcpConfig), "utf8");
+
+    fs.writeFileSync(
+      inboxPath(projectRoot),
+      YAML.stringify({
+        tasks: [
+          {
+            id: "T300",
+            title: "Local",
+            type: "task",
+            priority: "P2",
+            status: "inbox",
+            description: "Local version",
+            acceptance_criteria: [],
+            risks: [],
+            dependencies: [],
+            created_at: "2026-03-29T00:00:00.000Z",
+            updated_at: "2026-03-29T00:00:01.000Z"
+          }
+        ]
+      }),
+      "utf8"
+    );
+
+    fs.writeFileSync(
+      externalBoardPath(projectRoot),
+      YAML.stringify({
+        tasks: [
+          {
+            id: "T300",
+            title: "External",
+            type: "task",
+            priority: "P2",
+            status: "inbox",
+            description: "External version",
+            acceptance_criteria: [],
+            risks: [],
+            dependencies: [],
+            created_at: "2026-03-29T00:00:00.000Z",
+            updated_at: "2026-03-29T00:00:02.000Z"
+          }
+        ]
+      }),
+      "utf8"
+    );
+
+    const report = service.sync(projectRoot);
+    const inbox = YAML.parse(fs.readFileSync(inboxPath(projectRoot), "utf8")) as {
+      tasks: Array<{ id: string; description: string }>;
+    };
+
+    expect(report.ok).toBe(true);
+    expect(report.warnings.some((warning) => warning.message.includes("Conflict resolved"))).toBe(true);
+    expect(inbox.tasks.find((task) => task.id === "T300")?.description).toBe("External version");
   });
 });
