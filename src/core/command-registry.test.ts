@@ -141,6 +141,37 @@ describe("CommandRegistry", () => {
           errors: []
         })
       },
+      textPolicy: {
+        check: () => ({
+          ok: true,
+          checkedFiles: 0,
+          violations: [],
+          warnings: [],
+          errors: []
+        })
+      },
+      questions: {
+        status: () => ({
+          ok: true,
+          enabled: true,
+          language: "ru",
+          completed: true,
+          requiredBlocks: [],
+          answeredBlocks: [],
+          missingBlocks: [],
+          warnings: [],
+          errors: []
+        }),
+        run: () => ({
+          ok: true,
+          language: "ru",
+          completed: true,
+          missingBlocks: [],
+          updatedFiles: [],
+          warnings: [],
+          errors: []
+        })
+      },
       policyGate: {
         check: () => ({
           allowed: true,

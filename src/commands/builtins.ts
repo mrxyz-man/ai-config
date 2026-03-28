@@ -518,6 +518,168 @@ export const builtInCommands: CommandDefinition[] = [
     }
   },
   {
+    name: "text",
+    description: "Text quality checks",
+    register: (program: Command, context) => {
+      const text = program.command("text").description("Text quality checks");
+
+      text
+        .command("check")
+        .description("Run text reliability checks")
+        .option("--cwd <path>", "Project root path", ".")
+        .option("--format <format>", "Output format: human|json", "human")
+        .option("--confirm", "Confirm execution for policy-gated command", false)
+        .action((options: { cwd: string; format: "human" | "json"; confirm?: boolean }) => {
+          const targetDir = path.resolve(options.cwd);
+          const allowed = applyPolicy({
+            context,
+            projectRoot: targetDir,
+            command: "text check",
+            confirmed: options.confirm ?? false,
+            format: options.format
+          });
+          if (!allowed) {
+            return;
+          }
+
+          const report = context.textPolicy.check(targetDir);
+          const envelope = createEnvelope({
+            ok: report.ok,
+            command: "text check",
+            data: {
+              checkedFiles: report.checkedFiles,
+              violationCount: report.violations.length,
+              violations: report.violations
+            },
+            warnings: report.warnings,
+            errors: report.errors
+          });
+          emitEnvelope(envelope, options.format);
+          context.auditLogger.append(targetDir, {
+            actor: "user",
+            command: "text check",
+            timestamp: new Date().toISOString(),
+            decision: "auto-run",
+            outcome: report.ok ? "success" : "failed",
+            message: report.ok ? undefined : "Text check failed"
+          });
+
+          if (!report.ok) {
+            process.exitCode = 3;
+          }
+        });
+    }
+  },
+  {
+    name: "questions",
+    description: "Questionnaire management",
+    register: (program: Command, context) => {
+      const questions = program.command("questions").description("Questionnaire management");
+
+      questions
+        .command("status")
+        .description("Show questionnaire completion status")
+        .option("--cwd <path>", "Project root path", ".")
+        .option("--format <format>", "Output format: human|json", "human")
+        .option("--confirm", "Confirm execution for policy-gated command", false)
+        .action((options: { cwd: string; format: "human" | "json"; confirm?: boolean }) => {
+          const targetDir = path.resolve(options.cwd);
+          const allowed = applyPolicy({
+            context,
+            projectRoot: targetDir,
+            command: "questions status",
+            confirmed: options.confirm ?? false,
+            format: options.format
+          });
+          if (!allowed) {
+            return;
+          }
+
+          const report = context.questions.status(targetDir);
+          const envelope = createEnvelope({
+            ok: report.ok,
+            command: "questions status",
+            data: {
+              enabled: report.enabled,
+              language: report.language,
+              completed: report.completed,
+              missingBlocks: report.missingBlocks
+            },
+            warnings: report.warnings,
+            errors: report.errors
+          });
+          emitEnvelope(envelope, options.format);
+          context.auditLogger.append(targetDir, {
+            actor: "user",
+            command: "questions status",
+            timestamp: new Date().toISOString(),
+            decision: "auto-run",
+            outcome: report.ok ? "success" : "failed",
+            message: report.ok ? undefined : "Questions status failed"
+          });
+          if (!report.ok) {
+            process.exitCode = 1;
+          }
+        });
+
+      questions
+        .command("run")
+        .description("Run questionnaire update cycle")
+        .option("--cwd <path>", "Project root path", ".")
+        .option("--format <format>", "Output format: human|json", "human")
+        .option("--lang <code>", "Set questionnaire language for this run")
+        .option("--confirm", "Confirm execution for policy-gated command", false)
+        .action(
+          (options: {
+            cwd: string;
+            format: "human" | "json";
+            lang?: string;
+            confirm?: boolean;
+          }) => {
+            const targetDir = path.resolve(options.cwd);
+            const allowed = applyPolicy({
+              context,
+              projectRoot: targetDir,
+              command: "questions run",
+              confirmed: options.confirm ?? false,
+              format: options.format
+            });
+            if (!allowed) {
+              return;
+            }
+
+            const report = context.questions.run(targetDir, {
+              language: options.lang
+            });
+            const envelope = createEnvelope({
+              ok: report.ok,
+              command: "questions run",
+              data: {
+                language: report.language,
+                completed: report.completed,
+                missingBlocks: report.missingBlocks,
+                updatedFiles: report.updatedFiles
+              },
+              warnings: report.warnings,
+              errors: report.errors
+            });
+            emitEnvelope(envelope, options.format);
+            context.auditLogger.append(targetDir, {
+              actor: "user",
+              command: "questions run",
+              timestamp: new Date().toISOString(),
+              decision: "confirmed",
+              outcome: report.ok ? "success" : "failed",
+              message: report.ok ? undefined : "Questions run failed"
+            });
+            if (!report.ok) {
+              process.exitCode = 7;
+            }
+          }
+        );
+    }
+  },
+  {
     name: "mcp",
     description: "Manage MCP task integrations",
     register: (program: Command, context) => {

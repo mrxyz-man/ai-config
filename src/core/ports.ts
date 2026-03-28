@@ -243,3 +243,58 @@ export interface TaskBoardPort {
   ): TasksIntakeReport;
   list(projectRoot: string, options?: { status?: TaskStatus }): TasksListReport;
 }
+
+export type TextIssue = {
+  file: string;
+  message: string;
+  path?: string;
+};
+
+export type TextCheckReport = {
+  ok: boolean;
+  checkedFiles: number;
+  violations: Array<{
+    file: string;
+    signal: string;
+    excerpt: string;
+  }>;
+  warnings: TextIssue[];
+  errors: TextIssue[];
+};
+
+export interface TextPolicyPort {
+  check(projectRoot: string): TextCheckReport;
+}
+
+export type QuestionsIssue = {
+  file: string;
+  message: string;
+  path?: string;
+};
+
+export type QuestionsStatusReport = {
+  ok: boolean;
+  enabled: boolean;
+  language: string;
+  completed: boolean;
+  requiredBlocks: string[];
+  answeredBlocks: string[];
+  missingBlocks: string[];
+  warnings: QuestionsIssue[];
+  errors: QuestionsIssue[];
+};
+
+export type QuestionsRunReport = {
+  ok: boolean;
+  language: string;
+  completed: boolean;
+  missingBlocks: string[];
+  updatedFiles: string[];
+  warnings: QuestionsIssue[];
+  errors: QuestionsIssue[];
+};
+
+export interface QuestionsPort {
+  status(projectRoot: string): QuestionsStatusReport;
+  run(projectRoot: string, options?: { language?: string }): QuestionsRunReport;
+}

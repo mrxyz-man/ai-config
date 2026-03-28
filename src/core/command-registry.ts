@@ -4,6 +4,8 @@ import {
   AuditLoggerPort,
   ConfigInitializerPort,
   TaskBoardPort,
+  TextPolicyPort,
+  QuestionsPort,
   TaskMcpIntegrationPort,
   ConfigSyncPort,
   ConfigExplainerPort,
@@ -19,6 +21,8 @@ export type CommandContext = {
   explainer: ConfigExplainerPort;
   mcpIntegration: TaskMcpIntegrationPort;
   taskBoard: TaskBoardPort;
+  textPolicy: TextPolicyPort;
+  questions: QuestionsPort;
   validator: ConfigValidatorPort;
   resolver: ConfigResolverPort;
   policyGate: PolicyGatePort;

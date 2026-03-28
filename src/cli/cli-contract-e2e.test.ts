@@ -258,6 +258,58 @@ describe("CLI contract + e2e smoke", () => {
     expect(inbox).toContain("Implement healthcheck endpoint");
   });
 
+  it("questions status returns JSON envelope", () => {
+    const tempProject = createTempProjectWithAiConfig();
+    const result = runCliJson(["questions", "status", "--cwd", tempProject, "--format", "json"]);
+
+    expect(result.status).toBe(0);
+    expect(result.envelope.ok).toBe(true);
+    expect(result.envelope.command).toBe("questions status");
+    expect(Array.isArray(result.envelope.data.missingBlocks)).toBe(true);
+  });
+
+  it("questions run without --confirm is blocked by policy", () => {
+    const tempProject = createTempProjectWithAiConfig();
+    const result = runCliJson(["questions", "run", "--cwd", tempProject, "--format", "json"]);
+
+    expect(result.status).toBe(5);
+    expect(result.envelope.ok).toBe(false);
+    expect(result.envelope.command).toBe("questions run");
+  });
+
+  it("questions run with --confirm updates language", () => {
+    const tempProject = createTempProjectWithAiConfig();
+    const result = runCliJson([
+      "questions",
+      "run",
+      "--cwd",
+      tempProject,
+      "--confirm",
+      "--lang",
+      "en",
+      "--format",
+      "json"
+    ]);
+
+    expect(result.status).toBe(0);
+    expect(result.envelope.ok).toBe(true);
+    expect(result.envelope.data.language).toBe("en");
+  });
+
+  it("text check returns JSON envelope", () => {
+    const tempProject = createTempProjectWithAiConfig();
+    fs.writeFileSync(
+      path.join(tempProject, "ai/questions/profiles/default.yaml"),
+      'profile: "default"\nquestions: []\n',
+      "utf8"
+    );
+
+    const result = runCliJson(["text", "check", "--cwd", tempProject, "--format", "json"]);
+
+    expect(result.envelope.command).toBe("text check");
+    expect(typeof result.envelope.ok).toBe("boolean");
+  });
+
   it("sync with --confirm and --dry-run returns planned changes only", () => {
     const tempProject = createTempProjectWithAiConfig();
     const result = runCliJson([

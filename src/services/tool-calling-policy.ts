@@ -17,7 +17,16 @@ const POLICY_FILE_PATH = "ai/rules/tool-calling-policy.yaml";
 const DEFAULT_POLICY: ToolCallingPolicyFile = {
   version: "1.0",
   policy: "balanced",
-  auto_run: ["resolve", "validate", "explain", "mcp status", "tasks intake", "tasks list"],
+  auto_run: [
+    "resolve",
+    "validate",
+    "explain",
+    "mcp status",
+    "tasks intake",
+    "tasks list",
+    "text check",
+    "questions status"
+  ],
   confirm_required: [
     "init",
     "sync",
@@ -26,7 +35,8 @@ const DEFAULT_POLICY: ToolCallingPolicyFile = {
     "mcp disconnect",
     "tasks sync",
     "tasks enable",
-    "tasks disable"
+    "tasks disable",
+    "questions run"
   ],
   deny: ["unknown_command"]
 };
