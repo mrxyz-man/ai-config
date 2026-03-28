@@ -28,6 +28,18 @@ describe("TaskMcpIntegrationService", () => {
     expect(report.mode).toBe("local");
   });
 
+  it("reports auth/config checks for gitlab provider", () => {
+    const projectRoot = createTempProject();
+    const service = new TaskMcpIntegrationService();
+    service.connect(projectRoot, { provider: "gitlab", mode: "hybrid" });
+
+    const report = service.status(projectRoot);
+
+    expect(report.ok).toBe(true);
+    expect(report.warnings.length).toBeGreaterThan(0);
+    expect(report.providerHealth).toContain("auth=missing");
+  });
+
   it("connects gitlab provider and switches tasks mode", () => {
     const projectRoot = createTempProject();
     const service = new TaskMcpIntegrationService();

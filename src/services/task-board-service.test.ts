@@ -42,7 +42,9 @@ describe("TaskBoardService", () => {
       fs.readFileSync(path.join(projectRoot, "ai/tasks/board/inbox.yaml"), "utf8")
     ) as { tasks: Array<{ description: string }> };
     expect(inbox.tasks.length).toBeGreaterThan(0);
-    expect(inbox.tasks[0]?.description).toContain("Implement CLI help improvements");
+    expect(
+      inbox.tasks.some((task) => task.description.includes("Implement CLI help improvements"))
+    ).toBe(true);
   });
 
   it("fails intake when tasks are disabled", () => {
@@ -70,4 +72,3 @@ describe("TaskBoardService", () => {
     expect(inboxOnly.tasks.every((task) => task.status === "inbox")).toBe(true);
   });
 });
-

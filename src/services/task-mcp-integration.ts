@@ -30,7 +30,8 @@ const McpConfigSchema = z.object({
   provider: z.enum(["gitlab", "custom"]).nullable(),
   mode: z.enum(["local", "hybrid", "remote-first"]),
   sync_direction: z.enum(["none", "push", "pull", "bidirectional"]),
-  notes: z.string().optional()
+  notes: z.string().optional(),
+  provider_config: z.record(z.string(), z.unknown()).optional().default({})
 });
 
 type TaskConfig = z.infer<typeof TaskConfigSchema>;
@@ -38,6 +39,8 @@ type McpConfig = z.infer<typeof McpConfigSchema>;
 
 type ProviderHealth = {
   ok: boolean;
+  authOk: boolean;
+  capabilities: string[];
   message: string;
 };
 
@@ -50,18 +53,55 @@ interface TaskMcpProvider {
 class GitLabMcpProvider implements TaskMcpProvider {
   readonly name: McpProviderName = "gitlab";
 
-  health(projectRoot: string): ProviderHealth {
+  health(projectRoot: string, config: McpConfig): ProviderHealth {
+    const apiUrl =
+      typeof config.provider_config.api_url === "string"
+        ? config.provider_config.api_url
+        : "";
+    const projectId =
+      typeof config.provider_config.project_id === "string"
+        ? config.provider_config.project_id
+        : "";
+    const tokenEnv =
+      typeof config.provider_config.token_env === "string"
+        ? config.provider_config.token_env
+        : "GITLAB_TOKEN";
+
+    if (!apiUrl || !projectId) {
+      return {
+        ok: false,
+        authOk: false,
+        capabilities: ["tasks.pull", "tasks.push", "tasks.sync"],
+        message:
+          "GitLab provider config incomplete: set provider_config.api_url and provider_config.project_id"
+      };
+    }
+
+    const token = process.env[tokenEnv];
+    if (!token) {
+      return {
+        ok: false,
+        authOk: false,
+        capabilities: ["tasks.pull", "tasks.push", "tasks.sync"],
+        message: `Missing auth token in env var "${tokenEnv}"`
+      };
+    }
+
     const envPath = path.join(projectRoot, ".env");
     const hasEnv = fs.existsSync(envPath);
     if (!hasEnv) {
       return {
         ok: false,
-        message: "GitLab adapter skeleton: missing .env (expected MCP credentials later)"
+        authOk: true,
+        capabilities: ["tasks.pull", "tasks.push", "tasks.sync"],
+        message: "GitLab adapter skeleton: .env file not found (optional if env is provided elsewhere)"
       };
     }
 
     return {
       ok: false,
+      authOk: true,
+      capabilities: ["tasks.pull", "tasks.push", "tasks.sync"],
       message: "GitLab adapter skeleton is configured but not implemented yet"
     };
   }
@@ -71,6 +111,8 @@ class GitLabMcpProvider implements TaskMcpProvider {
     void config;
     return {
       ok: false,
+      authOk: true,
+      capabilities: ["tasks.pull", "tasks.push", "tasks.sync"],
       message: "GitLab sync skeleton is not implemented yet"
     };
   }
@@ -81,10 +123,15 @@ class CustomMcpProvider implements TaskMcpProvider {
 
   health(projectRoot: string, config: McpConfig): ProviderHealth {
     void projectRoot;
-    void config;
+    const strategy =
+      typeof config.provider_config.strategy === "string"
+        ? config.provider_config.strategy
+        : "delegate";
     return {
       ok: true,
-      message: "Custom MCP provider is managed by user configuration"
+      authOk: true,
+      capabilities: ["tasks.sync", "tasks.pull", "tasks.push"],
+      message: `Custom MCP provider is user-managed (strategy: ${strategy})`
     };
   }
 
@@ -93,6 +140,8 @@ class CustomMcpProvider implements TaskMcpProvider {
     void config;
     return {
       ok: true,
+      authOk: true,
+      capabilities: ["tasks.sync", "tasks.pull", "tasks.push"],
       message: "Custom MCP sync delegated to user-managed provider"
     };
   }
@@ -168,7 +217,7 @@ export class TaskMcpIntegrationService implements TaskMcpIntegrationPort {
           });
         } else {
           const health = provider.health(projectRoot, mcpConfig);
-          providerHealth = health.message;
+          providerHealth = `${health.message} (auth=${health.authOk ? "ok" : "missing"}, capabilities=${health.capabilities.join(",")})`;
           if (!health.ok) {
             warnings.push({
               file: MCP_CONFIG_PATH,
@@ -219,6 +268,17 @@ export class TaskMcpIntegrationService implements TaskMcpIntegrationPort {
         provider: input.provider,
         mode: nextMode,
         sync_direction: nextDirection,
+        provider_config:
+          input.provider === "gitlab"
+            ? {
+              api_url: "https://gitlab.example.com/api/v4",
+              project_id: "group/project",
+              token_env: "GITLAB_TOKEN"
+            }
+            : {
+              strategy: "delegate",
+              adapter_hint: "user-managed-mcp"
+            },
         notes:
           input.provider === "gitlab"
             ? "Connected via MCP integration service v1 skeleton"
@@ -267,6 +327,7 @@ export class TaskMcpIntegrationService implements TaskMcpIntegrationPort {
         provider: null,
         mode: "local",
         sync_direction: "none",
+        provider_config: {},
         notes: "Disconnected from MCP provider"
       };
 
