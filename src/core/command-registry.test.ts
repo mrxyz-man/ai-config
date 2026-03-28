@@ -1,0 +1,52 @@
+import { describe, expect, it } from "@jest/globals";
+import { Command } from "commander";
+
+import { CommandRegistry } from "./command-registry";
+import { ModuleRegistry } from "./module-registry";
+
+describe("CommandRegistry", () => {
+  it("registers commands and applies them to commander", () => {
+    const registry = new CommandRegistry();
+    const program = new Command();
+    let called = false;
+
+    registry.register({
+      name: "hello",
+      description: "Test command",
+      register: (root) => {
+        root.command("hello").action(() => {
+          called = true;
+        });
+      }
+    });
+
+    registry.apply(program, {
+      moduleRegistry: new ModuleRegistry(),
+      resolver: { resolve: () => undefined },
+      validator: {
+        validate: () => ({
+          ok: true,
+          validatedFiles: [],
+          errors: [],
+          warnings: []
+        })
+      }
+    });
+
+    program.parse(["node", "test", "hello"], { from: "node" });
+    expect(called).toBe(true);
+  });
+
+  it("throws for duplicate command names", () => {
+    const registry = new CommandRegistry();
+    const command = {
+      name: "dup",
+      description: "Duplicate command",
+      register: () => undefined
+    };
+
+    registry.register(command);
+    expect(() => registry.register(command)).toThrow('Command "dup" is already registered');
+  });
+});
+

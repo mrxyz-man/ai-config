@@ -22,3 +22,8 @@ npm run dev
 - `npm run lint:fix` - auto-fix lint/style issues
 - `npm run clean` - remove build artifacts
 
+## Extensibility Skeleton
+
+- Commands are registered via command registry (`src/commands/builtins.ts` + `src/core/command-registry.ts`).
+- Modules are registered via module registry (`src/modules/builtin-modules.ts` + `src/core/module-registry.ts`).
+- Core service contracts are isolated as ports (`src/core/ports.ts`), so resolver/validator implementations can evolve without rewriting CLI wiring.

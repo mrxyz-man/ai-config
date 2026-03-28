@@ -1,10 +1,4 @@
 tasks:
-  - id: "T5"
-    title: "Implement scalable architecture skeleton (module/command registry)"
-    type: "task"
-    priority: "P0"
-    status: "ready"
-    dependencies: ["T4"]
   - id: "T6"
     title: "Define singleton boundaries and anti-pattern guardrails"
     type: "task"

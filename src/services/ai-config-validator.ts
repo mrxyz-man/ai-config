@@ -3,6 +3,7 @@ import path from "node:path";
 
 import YAML from "yaml";
 import { z } from "zod";
+import { ConfigValidatorPort, ValidationIssue, ValidationReport } from "../core/ports";
 
 import {
   AiConfig,
@@ -18,19 +19,6 @@ import {
 } from "../domain/contracts";
 
 type ConfigFileKey = "ai" | "modules" | "project" | "resolved" | "ignore";
-
-export type ValidationIssue = {
-  file: string;
-  message: string;
-  path?: string;
-};
-
-export type ValidationReport = {
-  ok: boolean;
-  validatedFiles: string[];
-  errors: ValidationIssue[];
-  warnings: ValidationIssue[];
-};
 
 type ParsedConfigs = {
   ai?: AiConfig;
@@ -210,3 +198,9 @@ export const validateAiConfigContracts = (projectRoot: string): ValidationReport
     warnings
   };
 };
+
+export class AiConfigValidator implements ConfigValidatorPort {
+  validate(projectRoot: string): ValidationReport {
+    return validateAiConfigContracts(projectRoot);
+  }
+}
