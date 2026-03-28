@@ -1,7 +1,7 @@
-import test from "node:test";
-import assert from "node:assert/strict";
+import { describe, expect, it } from "@jest/globals";
 
-test("foundation smoke", () => {
-  assert.equal(1 + 1, 2);
+describe("foundation smoke", () => {
+  it("works", () => {
+    expect(1 + 1).toBe(2);
+  });
 });
-

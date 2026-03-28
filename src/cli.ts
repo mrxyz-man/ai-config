@@ -1,32 +1,42 @@
 #!/usr/bin/env node
 
-const [, , ...args] = process.argv;
+import { Command } from "commander";
 
-const command = args[0] ?? "help";
+const program = new Command();
 
-const showHelp = (): void => {
-  console.log("ai-config CLI (v1 foundation)");
-  console.log("");
-  console.log("Usage:");
-  console.log("  ai-config <command> [options]");
-  console.log("");
-  console.log("Commands:");
-  console.log("  init       Bootstrap ./ai configuration");
-  console.log("  sync       Sync managed configuration layers");
-  console.log("  resolve    Build resolved agent configuration");
-  console.log("  validate   Run configuration validation");
-  console.log("  explain    Explain resolved provenance");
+const notImplemented = (name: string): void => {
+  console.log(`Command "${name}" is not implemented yet.`);
+  console.log('Run "ai-config --help" to see available commands.');
 };
 
-switch (command) {
-  case "help":
-  case "--help":
-  case "-h":
-    showHelp();
-    break;
-  default:
-    console.log(`Command "${command}" is not implemented yet.`);
-    console.log('Run "ai-config help" to see available commands.');
-    process.exitCode = 0;
-}
+program
+  .name("ai-config")
+  .description("Configuration and synchronization system for AI agents")
+  .version("0.1.0");
 
+program
+  .command("init")
+  .description("Bootstrap ./ai configuration")
+  .action(() => notImplemented("init"));
+
+program
+  .command("sync")
+  .description("Sync managed configuration layers")
+  .action(() => notImplemented("sync"));
+
+program
+  .command("resolve")
+  .description("Build resolved agent configuration")
+  .action(() => notImplemented("resolve"));
+
+program
+  .command("validate")
+  .description("Run configuration validation")
+  .action(() => notImplemented("validate"));
+
+program
+  .command("explain")
+  .description("Explain resolved provenance")
+  .action(() => notImplemented("explain"));
+
+program.parse(process.argv);
