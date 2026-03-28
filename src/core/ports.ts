@@ -137,3 +137,45 @@ export type ExplainReport = {
 export interface ConfigExplainerPort {
   explain(projectRoot: string, options?: { key?: string; module?: string }): ExplainReport;
 }
+
+export type McpProviderName = "gitlab";
+export type TaskMode = "local" | "hybrid" | "remote-first";
+export type McpSyncDirection = "none" | "push" | "pull" | "bidirectional";
+
+export type McpIntegrationIssue = {
+  file: string;
+  message: string;
+  path?: string;
+};
+
+export type McpIntegrationStatusReport = {
+  ok: boolean;
+  provider: McpProviderName | null;
+  enabled: boolean;
+  mode: TaskMode;
+  syncDirection: McpSyncDirection;
+  notes?: string;
+  providerHealth?: string;
+  warnings: McpIntegrationIssue[];
+  errors: McpIntegrationIssue[];
+};
+
+export type McpIntegrationMutationReport = {
+  ok: boolean;
+  provider: McpProviderName | null;
+  mode: TaskMode;
+  syncDirection: McpSyncDirection;
+  updatedFiles: string[];
+  warnings: McpIntegrationIssue[];
+  errors: McpIntegrationIssue[];
+};
+
+export interface TaskMcpIntegrationPort {
+  status(projectRoot: string): McpIntegrationStatusReport;
+  connect(
+    projectRoot: string,
+    input: { provider: McpProviderName; mode?: TaskMode }
+  ): McpIntegrationMutationReport;
+  disconnect(projectRoot: string): McpIntegrationMutationReport;
+  sync(projectRoot: string): McpIntegrationMutationReport;
+}

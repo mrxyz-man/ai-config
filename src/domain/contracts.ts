@@ -105,7 +105,7 @@ export const AgentRegistrySchema = z.object({
 
 export const TasksConfigSchema = z.object({
   enabled: z.boolean(),
-  mode: z.string().min(1),
+  mode: z.enum(["local", "hybrid", "remote-first"]),
   always_offer_task_creation: z.boolean(),
   epic_auto_decomposition: z.boolean(),
   statuses: z.array(z.string().min(1)).min(1),

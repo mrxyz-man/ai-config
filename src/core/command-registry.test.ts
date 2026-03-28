@@ -69,6 +69,44 @@ describe("CommandRegistry", () => {
           errors: []
         })
       },
+      mcpIntegration: {
+        status: () => ({
+          ok: true,
+          provider: null,
+          enabled: false,
+          mode: "local",
+          syncDirection: "none",
+          warnings: [],
+          errors: []
+        }),
+        connect: () => ({
+          ok: true,
+          provider: "gitlab",
+          mode: "hybrid",
+          syncDirection: "pull",
+          updatedFiles: [],
+          warnings: [],
+          errors: []
+        }),
+        disconnect: () => ({
+          ok: true,
+          provider: null,
+          mode: "local",
+          syncDirection: "none",
+          updatedFiles: [],
+          warnings: [],
+          errors: []
+        }),
+        sync: () => ({
+          ok: false,
+          provider: null,
+          mode: "local",
+          syncDirection: "none",
+          updatedFiles: [],
+          warnings: [],
+          errors: [{ file: "ai/tasks/integrations/mcp.yaml", message: "not connected" }]
+        })
+      },
       policyGate: {
         check: () => ({
           allowed: true,

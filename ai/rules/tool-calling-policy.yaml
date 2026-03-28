@@ -11,6 +11,7 @@ auto_run:
   - "questions status"
   - "ignore list"
   - "ignore check"
+  - "mcp status"
 
 confirm_required:
   - "init"
@@ -29,4 +30,3 @@ confirm_required:
 
 deny:
   - "unknown_command"
-

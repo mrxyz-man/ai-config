@@ -516,5 +516,261 @@ export const builtInCommands: CommandDefinition[] = [
           }
         );
     }
+  },
+  {
+    name: "mcp",
+    description: "Manage MCP task integrations",
+    register: (program: Command, context) => {
+      const mcp = program.command("mcp").description("Manage MCP task integrations");
+
+      mcp
+        .command("status")
+        .description("Show MCP integration status")
+        .option("--cwd <path>", "Project root path", ".")
+        .option("--format <format>", "Output format: human|json", "human")
+        .option("--confirm", "Confirm execution for policy-gated command", false)
+        .action((options: { cwd: string; format: "human" | "json"; confirm?: boolean }) => {
+          const targetDir = path.resolve(options.cwd);
+          const allowed = applyPolicy({
+            context,
+            projectRoot: targetDir,
+            command: "mcp status",
+            confirmed: options.confirm ?? false,
+            format: options.format
+          });
+          if (!allowed) {
+            return;
+          }
+
+          const report = context.mcpIntegration.status(targetDir);
+          const envelope = createEnvelope({
+            ok: report.ok,
+            command: "mcp status",
+            data: {
+              enabled: report.enabled,
+              provider: report.provider,
+              mode: report.mode,
+              syncDirection: report.syncDirection,
+              providerHealth: report.providerHealth
+            },
+            warnings: report.warnings,
+            errors: report.errors
+          });
+          emitEnvelope(envelope, options.format);
+          if (options.format === "human") {
+            if (report.ok) {
+              console.log(
+                `MCP status: enabled=${report.enabled}, provider=${report.provider ?? "none"}, mode=${report.mode}`
+              );
+              if (report.providerHealth) {
+                console.log(`Provider health: ${report.providerHealth}`);
+              }
+            } else {
+              console.error("MCP status failed.");
+            }
+          }
+
+          context.auditLogger.append(targetDir, {
+            actor: "user",
+            command: "mcp status",
+            timestamp: new Date().toISOString(),
+            decision: "auto-run",
+            outcome: report.ok ? "success" : "failed",
+            message: report.ok ? undefined : "MCP status failed"
+          });
+
+          if (!report.ok) {
+            process.exitCode = 1;
+          }
+        });
+
+      mcp
+        .command("connect <provider>")
+        .description("Connect MCP provider for task sync")
+        .option("--cwd <path>", "Project root path", ".")
+        .option("--format <format>", "Output format: human|json", "human")
+        .option("--mode <mode>", "Task mode after connect: local|hybrid|remote-first", "hybrid")
+        .option("--confirm", "Confirm execution for policy-gated command", false)
+        .action(
+          (
+            provider: "gitlab",
+            options: {
+              cwd: string;
+              format: "human" | "json";
+              mode?: "local" | "hybrid" | "remote-first";
+              confirm?: boolean;
+            }
+          ) => {
+            const targetDir = path.resolve(options.cwd);
+            const allowed = applyPolicy({
+              context,
+              projectRoot: targetDir,
+              command: "mcp connect",
+              confirmed: options.confirm ?? false,
+              format: options.format
+            });
+            if (!allowed) {
+              return;
+            }
+
+            const validModes = ["local", "hybrid", "remote-first"];
+            if (options.mode && !validModes.includes(options.mode)) {
+              const envelope = createEnvelope({
+                ok: false,
+                command: "mcp connect",
+                data: {
+                  providedMode: options.mode
+                },
+                warnings: [],
+                errors: [{ message: `Invalid mode "${options.mode}"` }]
+              });
+              emitEnvelope(envelope, options.format);
+              process.exitCode = 2;
+              return;
+            }
+
+            const report = context.mcpIntegration.connect(targetDir, {
+              provider,
+              mode: options.mode ?? "hybrid"
+            });
+            const envelope = createEnvelope({
+              ok: report.ok,
+              command: "mcp connect",
+              data: {
+                provider: report.provider,
+                mode: report.mode,
+                syncDirection: report.syncDirection,
+                updatedFiles: report.updatedFiles
+              },
+              warnings: report.warnings,
+              errors: report.errors
+            });
+            emitEnvelope(envelope, options.format);
+            if (options.format === "human") {
+              if (report.ok) {
+                console.log(
+                  `MCP connected: provider=${report.provider}, mode=${report.mode}, direction=${report.syncDirection}`
+                );
+              } else {
+                console.error("MCP connect failed.");
+              }
+            }
+
+            context.auditLogger.append(targetDir, {
+              actor: "user",
+              command: "mcp connect",
+              timestamp: new Date().toISOString(),
+              decision: "confirmed",
+              outcome: report.ok ? "success" : "failed",
+              message: report.ok ? undefined : "MCP connect failed"
+            });
+
+            if (!report.ok) {
+              process.exitCode = 7;
+            }
+          }
+        );
+
+      mcp
+        .command("disconnect")
+        .description("Disconnect MCP provider and return tasks mode to local")
+        .option("--cwd <path>", "Project root path", ".")
+        .option("--format <format>", "Output format: human|json", "human")
+        .option("--confirm", "Confirm execution for policy-gated command", false)
+        .action((options: { cwd: string; format: "human" | "json"; confirm?: boolean }) => {
+          const targetDir = path.resolve(options.cwd);
+          const allowed = applyPolicy({
+            context,
+            projectRoot: targetDir,
+            command: "mcp disconnect",
+            confirmed: options.confirm ?? false,
+            format: options.format
+          });
+          if (!allowed) {
+            return;
+          }
+
+          const report = context.mcpIntegration.disconnect(targetDir);
+          const envelope = createEnvelope({
+            ok: report.ok,
+            command: "mcp disconnect",
+            data: {
+              provider: report.provider,
+              mode: report.mode,
+              syncDirection: report.syncDirection,
+              updatedFiles: report.updatedFiles
+            },
+            warnings: report.warnings,
+            errors: report.errors
+          });
+          emitEnvelope(envelope, options.format);
+
+          context.auditLogger.append(targetDir, {
+            actor: "user",
+            command: "mcp disconnect",
+            timestamp: new Date().toISOString(),
+            decision: "confirmed",
+            outcome: report.ok ? "success" : "failed",
+            message: report.ok ? undefined : "MCP disconnect failed"
+          });
+
+          if (!report.ok) {
+            process.exitCode = 7;
+          }
+        });
+    }
+  },
+  {
+    name: "tasks",
+    description: "Manage tasks operations",
+    register: (program: Command, context) => {
+      const tasks = program.command("tasks").description("Manage tasks operations");
+
+      tasks
+        .command("sync")
+        .description("Sync tasks using configured MCP provider")
+        .option("--cwd <path>", "Project root path", ".")
+        .option("--format <format>", "Output format: human|json", "human")
+        .option("--confirm", "Confirm execution for policy-gated command", false)
+        .action((options: { cwd: string; format: "human" | "json"; confirm?: boolean }) => {
+          const targetDir = path.resolve(options.cwd);
+          const allowed = applyPolicy({
+            context,
+            projectRoot: targetDir,
+            command: "tasks sync",
+            confirmed: options.confirm ?? false,
+            format: options.format
+          });
+          if (!allowed) {
+            return;
+          }
+
+          const report = context.mcpIntegration.sync(targetDir);
+          const envelope = createEnvelope({
+            ok: report.ok,
+            command: "tasks sync",
+            data: {
+              provider: report.provider,
+              mode: report.mode,
+              syncDirection: report.syncDirection
+            },
+            warnings: report.warnings,
+            errors: report.errors
+          });
+          emitEnvelope(envelope, options.format);
+          context.auditLogger.append(targetDir, {
+            actor: "user",
+            command: "tasks sync",
+            timestamp: new Date().toISOString(),
+            decision: "confirmed",
+            outcome: report.ok ? "success" : "failed",
+            message: report.ok ? undefined : "Tasks sync failed"
+          });
+
+          if (!report.ok) {
+            process.exitCode = 6;
+          }
+        });
+    }
   }
 ];
