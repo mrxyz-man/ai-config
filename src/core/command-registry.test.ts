@@ -107,6 +107,40 @@ describe("CommandRegistry", () => {
           errors: [{ file: "ai/tasks/integrations/mcp.yaml", message: "not connected" }]
         })
       },
+      taskBoard: {
+        enable: () => ({
+          ok: true,
+          enabled: true,
+          mode: "local",
+          updatedFiles: [],
+          warnings: [],
+          errors: []
+        }),
+        disable: () => ({
+          ok: true,
+          enabled: false,
+          mode: "local",
+          updatedFiles: [],
+          warnings: [],
+          errors: []
+        }),
+        intake: () => ({
+          ok: true,
+          task: null,
+          targetStatus: "inbox",
+          updatedFiles: [],
+          warnings: [],
+          errors: []
+        }),
+        list: () => ({
+          ok: true,
+          enabled: true,
+          mode: "local",
+          tasks: [],
+          warnings: [],
+          errors: []
+        })
+      },
       policyGate: {
         check: () => ({
           allowed: true,

@@ -179,3 +179,67 @@ export interface TaskMcpIntegrationPort {
   disconnect(projectRoot: string): McpIntegrationMutationReport;
   sync(projectRoot: string): McpIntegrationMutationReport;
 }
+
+export type TaskPriority = "P0" | "P1" | "P2" | "P3";
+export type TaskType = "task" | "bug" | "epic";
+export type TaskStatus = "inbox" | "ready" | "in_progress" | "review" | "done";
+
+export type TaskRecord = {
+  id: string;
+  title: string;
+  type: TaskType;
+  priority: TaskPriority;
+  status: TaskStatus;
+  description: string;
+  acceptance_criteria: string[];
+  risks: string[];
+  dependencies: string[];
+  owner_role?: string;
+  estimate?: string;
+  created_at: string;
+  source?: string;
+};
+
+export type TasksIssue = {
+  file: string;
+  message: string;
+  path?: string;
+};
+
+export type TasksToggleReport = {
+  ok: boolean;
+  enabled: boolean;
+  mode: TaskMode;
+  updatedFiles: string[];
+  warnings: TasksIssue[];
+  errors: TasksIssue[];
+};
+
+export type TasksIntakeReport = {
+  ok: boolean;
+  task: TaskRecord | null;
+  targetStatus: TaskStatus;
+  updatedFiles: string[];
+  warnings: TasksIssue[];
+  errors: TasksIssue[];
+};
+
+export type TasksListReport = {
+  ok: boolean;
+  enabled: boolean;
+  mode: TaskMode;
+  statusFilter?: TaskStatus;
+  tasks: TaskRecord[];
+  warnings: TasksIssue[];
+  errors: TasksIssue[];
+};
+
+export interface TaskBoardPort {
+  enable(projectRoot: string): TasksToggleReport;
+  disable(projectRoot: string): TasksToggleReport;
+  intake(
+    projectRoot: string,
+    input: { text: string; type?: TaskType; priority?: TaskPriority; source?: string }
+  ): TasksIntakeReport;
+  list(projectRoot: string, options?: { status?: TaskStatus }): TasksListReport;
+}

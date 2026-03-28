@@ -593,7 +593,7 @@ export const builtInCommands: CommandDefinition[] = [
         .option("--confirm", "Confirm execution for policy-gated command", false)
         .action(
           (
-            provider: "gitlab",
+            provider: string,
             options: {
               cwd: string;
               format: "human" | "json";
@@ -610,6 +610,21 @@ export const builtInCommands: CommandDefinition[] = [
               format: options.format
             });
             if (!allowed) {
+              return;
+            }
+
+            if (provider !== "gitlab") {
+              const envelope = createEnvelope({
+                ok: false,
+                command: "mcp connect",
+                data: {
+                  providedProvider: provider
+                },
+                warnings: [],
+                errors: [{ message: `Unsupported provider "${provider}"` }]
+              });
+              emitEnvelope(envelope, options.format);
+              process.exitCode = 2;
               return;
             }
 
@@ -630,7 +645,7 @@ export const builtInCommands: CommandDefinition[] = [
             }
 
             const report = context.mcpIntegration.connect(targetDir, {
-              provider,
+              provider: "gitlab",
               mode: options.mode ?? "hybrid"
             });
             const envelope = createEnvelope({
@@ -725,6 +740,266 @@ export const builtInCommands: CommandDefinition[] = [
     description: "Manage tasks operations",
     register: (program: Command, context) => {
       const tasks = program.command("tasks").description("Manage tasks operations");
+
+      tasks
+        .command("enable")
+        .description("Enable task-first workflow")
+        .option("--cwd <path>", "Project root path", ".")
+        .option("--format <format>", "Output format: human|json", "human")
+        .option("--confirm", "Confirm execution for policy-gated command", false)
+        .action((options: { cwd: string; format: "human" | "json"; confirm?: boolean }) => {
+          const targetDir = path.resolve(options.cwd);
+          const allowed = applyPolicy({
+            context,
+            projectRoot: targetDir,
+            command: "tasks enable",
+            confirmed: options.confirm ?? false,
+            format: options.format
+          });
+          if (!allowed) {
+            return;
+          }
+
+          const report = context.taskBoard.enable(targetDir);
+          const envelope = createEnvelope({
+            ok: report.ok,
+            command: "tasks enable",
+            data: {
+              enabled: report.enabled,
+              mode: report.mode,
+              updatedFiles: report.updatedFiles
+            },
+            warnings: report.warnings,
+            errors: report.errors
+          });
+          emitEnvelope(envelope, options.format);
+          context.auditLogger.append(targetDir, {
+            actor: "user",
+            command: "tasks enable",
+            timestamp: new Date().toISOString(),
+            decision: "confirmed",
+            outcome: report.ok ? "success" : "failed",
+            message: report.ok ? undefined : "Tasks enable failed"
+          });
+          if (!report.ok) {
+            process.exitCode = 7;
+          }
+        });
+
+      tasks
+        .command("disable")
+        .description("Disable task-first workflow")
+        .option("--cwd <path>", "Project root path", ".")
+        .option("--format <format>", "Output format: human|json", "human")
+        .option("--confirm", "Confirm execution for policy-gated command", false)
+        .action((options: { cwd: string; format: "human" | "json"; confirm?: boolean }) => {
+          const targetDir = path.resolve(options.cwd);
+          const allowed = applyPolicy({
+            context,
+            projectRoot: targetDir,
+            command: "tasks disable",
+            confirmed: options.confirm ?? false,
+            format: options.format
+          });
+          if (!allowed) {
+            return;
+          }
+
+          const report = context.taskBoard.disable(targetDir);
+          const envelope = createEnvelope({
+            ok: report.ok,
+            command: "tasks disable",
+            data: {
+              enabled: report.enabled,
+              mode: report.mode,
+              updatedFiles: report.updatedFiles
+            },
+            warnings: report.warnings,
+            errors: report.errors
+          });
+          emitEnvelope(envelope, options.format);
+          context.auditLogger.append(targetDir, {
+            actor: "user",
+            command: "tasks disable",
+            timestamp: new Date().toISOString(),
+            decision: "confirmed",
+            outcome: report.ok ? "success" : "failed",
+            message: report.ok ? undefined : "Tasks disable failed"
+          });
+          if (!report.ok) {
+            process.exitCode = 7;
+          }
+        });
+
+      tasks
+        .command("intake <text>")
+        .description("Create structured task from user text")
+        .option("--cwd <path>", "Project root path", ".")
+        .option("--format <format>", "Output format: human|json", "human")
+        .option("--type <type>", "Task type: task|bug|epic")
+        .option("--priority <priority>", "Priority: P0|P1|P2|P3")
+        .option("--source <source>", "Source reference for intake")
+        .option("--confirm", "Confirm execution for policy-gated command", false)
+        .action(
+          (
+            text: string,
+            options: {
+              cwd: string;
+              format: "human" | "json";
+              type?: "task" | "bug" | "epic";
+              priority?: "P0" | "P1" | "P2" | "P3";
+              source?: string;
+              confirm?: boolean;
+            }
+          ) => {
+            const targetDir = path.resolve(options.cwd);
+            const allowed = applyPolicy({
+              context,
+              projectRoot: targetDir,
+              command: "tasks intake",
+              confirmed: options.confirm ?? false,
+              format: options.format
+            });
+            if (!allowed) {
+              return;
+            }
+
+            const validTypes = ["task", "bug", "epic"];
+            if (options.type && !validTypes.includes(options.type)) {
+              const envelope = createEnvelope({
+                ok: false,
+                command: "tasks intake",
+                data: {
+                  providedType: options.type
+                },
+                warnings: [],
+                errors: [{ message: `Invalid type "${options.type}"` }]
+              });
+              emitEnvelope(envelope, options.format);
+              process.exitCode = 2;
+              return;
+            }
+
+            const validPriorities = ["P0", "P1", "P2", "P3"];
+            if (options.priority && !validPriorities.includes(options.priority)) {
+              const envelope = createEnvelope({
+                ok: false,
+                command: "tasks intake",
+                data: {
+                  providedPriority: options.priority
+                },
+                warnings: [],
+                errors: [{ message: `Invalid priority "${options.priority}"` }]
+              });
+              emitEnvelope(envelope, options.format);
+              process.exitCode = 2;
+              return;
+            }
+
+            const report = context.taskBoard.intake(targetDir, {
+              text,
+              type: options.type,
+              priority: options.priority,
+              source: options.source
+            });
+            const envelope = createEnvelope({
+              ok: report.ok,
+              command: "tasks intake",
+              data: {
+                task: report.task,
+                targetStatus: report.targetStatus,
+                updatedFiles: report.updatedFiles
+              },
+              warnings: report.warnings,
+              errors: report.errors
+            });
+            emitEnvelope(envelope, options.format);
+            context.auditLogger.append(targetDir, {
+              actor: "user",
+              command: "tasks intake",
+              timestamp: new Date().toISOString(),
+              decision: "auto-run",
+              outcome: report.ok ? "success" : "failed",
+              message: report.ok ? undefined : "Tasks intake failed"
+            });
+            if (!report.ok) {
+              process.exitCode = 3;
+            }
+          }
+        );
+
+      tasks
+        .command("list")
+        .description("List tasks from local board")
+        .option("--cwd <path>", "Project root path", ".")
+        .option("--format <format>", "Output format: human|json", "human")
+        .option("--status <status>", "Status filter: inbox|ready|in_progress|review|done")
+        .option("--confirm", "Confirm execution for policy-gated command", false)
+        .action(
+          (options: {
+            cwd: string;
+            format: "human" | "json";
+            status?: "inbox" | "ready" | "in_progress" | "review" | "done";
+            confirm?: boolean;
+          }) => {
+            const targetDir = path.resolve(options.cwd);
+            const allowed = applyPolicy({
+              context,
+              projectRoot: targetDir,
+              command: "tasks list",
+              confirmed: options.confirm ?? false,
+              format: options.format
+            });
+            if (!allowed) {
+              return;
+            }
+
+            const validStatuses = ["inbox", "ready", "in_progress", "review", "done"];
+            if (options.status && !validStatuses.includes(options.status)) {
+              const envelope = createEnvelope({
+                ok: false,
+                command: "tasks list",
+                data: {
+                  providedStatus: options.status
+                },
+                warnings: [],
+                errors: [{ message: `Invalid status "${options.status}"` }]
+              });
+              emitEnvelope(envelope, options.format);
+              process.exitCode = 2;
+              return;
+            }
+
+            const report = context.taskBoard.list(targetDir, {
+              status: options.status
+            });
+            const envelope = createEnvelope({
+              ok: report.ok,
+              command: "tasks list",
+              data: {
+                enabled: report.enabled,
+                mode: report.mode,
+                statusFilter: report.statusFilter,
+                count: report.tasks.length,
+                tasks: report.tasks
+              },
+              warnings: report.warnings,
+              errors: report.errors
+            });
+            emitEnvelope(envelope, options.format);
+            context.auditLogger.append(targetDir, {
+              actor: "user",
+              command: "tasks list",
+              timestamp: new Date().toISOString(),
+              decision: "auto-run",
+              outcome: report.ok ? "success" : "failed",
+              message: report.ok ? undefined : "Tasks list failed"
+            });
+            if (!report.ok) {
+              process.exitCode = 1;
+            }
+          }
+        );
 
       tasks
         .command("sync")

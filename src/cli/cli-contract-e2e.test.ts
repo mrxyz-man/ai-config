@@ -209,6 +209,55 @@ describe("CLI contract + e2e smoke", () => {
     expect(mcpFile).toContain('provider: gitlab');
   });
 
+  it("tasks list returns JSON envelope", () => {
+    const tempProject = createTempProjectWithAiConfig();
+    const result = runCliJson(["tasks", "list", "--cwd", tempProject, "--format", "json"]);
+
+    expect(result.status).toBe(0);
+    expect(result.envelope.ok).toBe(true);
+    expect(result.envelope.command).toBe("tasks list");
+    expect(Array.isArray(result.envelope.data.tasks)).toBe(true);
+  });
+
+  it("tasks enable without --confirm is blocked by policy", () => {
+    const tempProject = createTempProjectWithAiConfig();
+    const result = runCliJson(["tasks", "enable", "--cwd", tempProject, "--format", "json"]);
+
+    expect(result.status).toBe(5);
+    expect(result.envelope.ok).toBe(false);
+    expect(result.envelope.command).toBe("tasks enable");
+  });
+
+  it("tasks enable with --confirm updates config", () => {
+    const tempProject = createTempProjectWithAiConfig();
+    runCliJson(["tasks", "disable", "--cwd", tempProject, "--confirm", "--format", "json"]);
+    const result = runCliJson(["tasks", "enable", "--cwd", tempProject, "--confirm", "--format", "json"]);
+
+    expect(result.status).toBe(0);
+    expect(result.envelope.ok).toBe(true);
+    const tasksConfig = fs.readFileSync(path.join(tempProject, "ai/tasks/config.yaml"), "utf8");
+    expect(tasksConfig).toContain("enabled: true");
+  });
+
+  it("tasks intake creates a task in inbox board", () => {
+    const tempProject = createTempProjectWithAiConfig();
+    const result = runCliJson([
+      "tasks",
+      "intake",
+      "Implement healthcheck endpoint",
+      "--cwd",
+      tempProject,
+      "--format",
+      "json"
+    ]);
+
+    expect(result.status).toBe(0);
+    expect(result.envelope.ok).toBe(true);
+    expect(result.envelope.command).toBe("tasks intake");
+    const inbox = fs.readFileSync(path.join(tempProject, "ai/tasks/board/inbox.yaml"), "utf8");
+    expect(inbox).toContain("Implement healthcheck endpoint");
+  });
+
   it("sync with --confirm and --dry-run returns planned changes only", () => {
     const tempProject = createTempProjectWithAiConfig();
     const result = runCliJson([

@@ -5,6 +5,7 @@ import { AiConfigInitializer } from "../services/ai-config-initializer";
 import { AiConfigResolver } from "../services/ai-config-resolver";
 import { AiConfigSyncer } from "../services/ai-config-syncer";
 import { AiConfigValidator } from "../services/ai-config-validator";
+import { TaskBoardService } from "../services/task-board-service";
 import { TaskMcpIntegrationService } from "../services/task-mcp-integration";
 import { ToolCallingPolicyGate } from "../services/tool-calling-policy";
 import { YamlAuditLogger } from "../services/yaml-audit-logger";
@@ -31,6 +32,7 @@ const buildFreshAppContext = (): AppContext => {
     syncer: new AiConfigSyncer(resolver),
     explainer: new AiConfigExplainer(),
     mcpIntegration: new TaskMcpIntegrationService(),
+    taskBoard: new TaskBoardService(),
     validator: new AiConfigValidator(),
     resolver,
     policyGate: new ToolCallingPolicyGate(),

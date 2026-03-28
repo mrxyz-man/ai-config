@@ -3,6 +3,7 @@ import { Command } from "commander";
 import {
   AuditLoggerPort,
   ConfigInitializerPort,
+  TaskBoardPort,
   TaskMcpIntegrationPort,
   ConfigSyncPort,
   ConfigExplainerPort,
@@ -17,6 +18,7 @@ export type CommandContext = {
   syncer: ConfigSyncPort;
   explainer: ConfigExplainerPort;
   mcpIntegration: TaskMcpIntegrationPort;
+  taskBoard: TaskBoardPort;
   validator: ConfigValidatorPort;
   resolver: ConfigResolverPort;
   policyGate: PolicyGatePort;
