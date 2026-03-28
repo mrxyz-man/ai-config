@@ -27,7 +27,7 @@ const TaskConfigSchema = z.object({
 
 const McpConfigSchema = z.object({
   enabled: z.boolean(),
-  provider: z.enum(["gitlab", "custom"]).nullable(),
+  provider: z.enum(["custom"]).nullable(),
   mode: z.enum(["local", "hybrid", "remote-first"]),
   sync_direction: z.enum(["none", "push", "pull", "bidirectional"]),
   notes: z.string().optional(),
@@ -48,74 +48,6 @@ interface TaskMcpProvider {
   readonly name: McpProviderName;
   health(projectRoot: string, config: McpConfig): ProviderHealth;
   sync(projectRoot: string, config: McpConfig): ProviderHealth;
-}
-
-class GitLabMcpProvider implements TaskMcpProvider {
-  readonly name: McpProviderName = "gitlab";
-
-  health(projectRoot: string, config: McpConfig): ProviderHealth {
-    const apiUrl =
-      typeof config.provider_config.api_url === "string"
-        ? config.provider_config.api_url
-        : "";
-    const projectId =
-      typeof config.provider_config.project_id === "string"
-        ? config.provider_config.project_id
-        : "";
-    const tokenEnv =
-      typeof config.provider_config.token_env === "string"
-        ? config.provider_config.token_env
-        : "GITLAB_TOKEN";
-
-    if (!apiUrl || !projectId) {
-      return {
-        ok: false,
-        authOk: false,
-        capabilities: ["tasks.pull", "tasks.push", "tasks.sync"],
-        message:
-          "GitLab provider config incomplete: set provider_config.api_url and provider_config.project_id"
-      };
-    }
-
-    const token = process.env[tokenEnv];
-    if (!token) {
-      return {
-        ok: false,
-        authOk: false,
-        capabilities: ["tasks.pull", "tasks.push", "tasks.sync"],
-        message: `Missing auth token in env var "${tokenEnv}"`
-      };
-    }
-
-    const envPath = path.join(projectRoot, ".env");
-    const hasEnv = fs.existsSync(envPath);
-    if (!hasEnv) {
-      return {
-        ok: false,
-        authOk: true,
-        capabilities: ["tasks.pull", "tasks.push", "tasks.sync"],
-        message: "GitLab adapter skeleton: .env file not found (optional if env is provided elsewhere)"
-      };
-    }
-
-    return {
-      ok: false,
-      authOk: true,
-      capabilities: ["tasks.pull", "tasks.push", "tasks.sync"],
-      message: "GitLab adapter skeleton is configured but not implemented yet"
-    };
-  }
-
-  sync(projectRoot: string, config: McpConfig): ProviderHealth {
-    void projectRoot;
-    void config;
-    return {
-      ok: false,
-      authOk: true,
-      capabilities: ["tasks.pull", "tasks.push", "tasks.sync"],
-      message: "GitLab sync skeleton is not implemented yet"
-    };
-  }
 }
 
 class CustomMcpProvider implements TaskMcpProvider {
@@ -195,7 +127,7 @@ const buildErrorReport = (
 export class TaskMcpIntegrationService implements TaskMcpIntegrationPort {
   private readonly providers: Map<McpProviderName, TaskMcpProvider>;
 
-  constructor(providers: TaskMcpProvider[] = [new GitLabMcpProvider(), new CustomMcpProvider()]) {
+  constructor(providers: TaskMcpProvider[] = [new CustomMcpProvider()]) {
     this.providers = new Map(providers.map((provider) => [provider.name, provider]));
   }
 
@@ -268,21 +200,11 @@ export class TaskMcpIntegrationService implements TaskMcpIntegrationPort {
         provider: input.provider,
         mode: nextMode,
         sync_direction: nextDirection,
-        provider_config:
-          input.provider === "gitlab"
-            ? {
-              api_url: "https://gitlab.example.com/api/v4",
-              project_id: "group/project",
-              token_env: "GITLAB_TOKEN"
-            }
-            : {
-              strategy: "delegate",
-              adapter_hint: "user-managed-mcp"
-            },
-        notes:
-          input.provider === "gitlab"
-            ? "Connected via MCP integration service v1 skeleton"
-            : "Connected custom provider (external user-managed MCP)"
+        provider_config: {
+          strategy: "delegate",
+          adapter_hint: "user-managed-mcp"
+        },
+        notes: "Connected custom provider (external user-managed MCP)"
       };
 
       const tasksAbsolutePath = path.join(projectRoot, TASKS_CONFIG_PATH);

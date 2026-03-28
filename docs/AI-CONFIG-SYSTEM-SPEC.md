@@ -186,7 +186,7 @@ Solves:
 Requirements:
 - Must be optionally enabled/disabled (`task-first` mode toggle).
 - Must always offer task creation when enabled.
-- Must support external task backends via MCP (e.g., GitLab).
+- Must support external task backends via MCP (user-managed custom provider).
 - Must support local mode, hybrid mode, and remote-first mode.
 - Must preserve task traceability between user request and execution.
 

@@ -45,7 +45,7 @@ Move from foundation + first vertical slice to feature-complete v1 workflow for 
 7. MCP integration prep (P2)
 - provider interface contract
 - local/hybrid mode toggles
-- initial GitLab adapter skeleton
+- initial custom provider skeleton
  - status: done
 
 8. Tasks/Text/Questions module minimums (M5 scope extension)

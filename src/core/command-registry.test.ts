@@ -81,7 +81,7 @@ describe("CommandRegistry", () => {
         }),
         connect: () => ({
           ok: true,
-          provider: "gitlab",
+          provider: "custom",
           mode: "hybrid",
           syncDirection: "pull",
           updatedFiles: [],

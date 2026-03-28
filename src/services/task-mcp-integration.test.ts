@@ -28,23 +28,24 @@ describe("TaskMcpIntegrationService", () => {
     expect(report.mode).toBe("local");
   });
 
-  it("reports auth/config checks for gitlab provider", () => {
+  it("reports health/capabilities for custom provider", () => {
     const projectRoot = createTempProject();
     const service = new TaskMcpIntegrationService();
-    service.connect(projectRoot, { provider: "gitlab", mode: "hybrid" });
+    service.connect(projectRoot, { provider: "custom", mode: "hybrid" });
 
     const report = service.status(projectRoot);
 
     expect(report.ok).toBe(true);
-    expect(report.warnings.length).toBeGreaterThan(0);
-    expect(report.providerHealth).toContain("auth=missing");
+    expect(report.warnings).toHaveLength(0);
+    expect(report.providerHealth).toContain("auth=ok");
+    expect(report.providerHealth).toContain("tasks.sync");
   });
 
-  it("connects gitlab provider and switches tasks mode", () => {
+  it("connects custom provider and switches tasks mode", () => {
     const projectRoot = createTempProject();
     const service = new TaskMcpIntegrationService();
 
-    const report = service.connect(projectRoot, { provider: "gitlab", mode: "hybrid" });
+    const report = service.connect(projectRoot, { provider: "custom", mode: "hybrid" });
 
     expect(report.ok).toBe(true);
     const tasksYaml = YAML.parse(fs.readFileSync(path.join(projectRoot, "ai/tasks/config.yaml"), "utf8")) as {
@@ -55,14 +56,14 @@ describe("TaskMcpIntegrationService", () => {
     ) as { enabled: boolean; provider: string | null; mode: string };
     expect(tasksYaml.mode).toBe("hybrid");
     expect(mcpYaml.enabled).toBe(true);
-    expect(mcpYaml.provider).toBe("gitlab");
+    expect(mcpYaml.provider).toBe("custom");
     expect(mcpYaml.mode).toBe("hybrid");
   });
 
   it("disconnects provider and restores local mode", () => {
     const projectRoot = createTempProject();
     const service = new TaskMcpIntegrationService();
-    service.connect(projectRoot, { provider: "gitlab", mode: "hybrid" });
+    service.connect(projectRoot, { provider: "custom", mode: "hybrid" });
 
     const report = service.disconnect(projectRoot);
 
@@ -73,7 +74,7 @@ describe("TaskMcpIntegrationService", () => {
     expect(tasksYaml.mode).toBe("local");
   });
 
-  it("connects custom provider for user-managed MCP strategy", () => {
+  it("writes provider_config for user-managed MCP strategy", () => {
     const projectRoot = createTempProject();
     const service = new TaskMcpIntegrationService();
 
@@ -83,9 +84,10 @@ describe("TaskMcpIntegrationService", () => {
     expect(report.provider).toBe("custom");
     const mcpYaml = YAML.parse(
       fs.readFileSync(path.join(projectRoot, "ai/tasks/integrations/mcp.yaml"), "utf8")
-    ) as { provider: string | null; enabled: boolean };
+    ) as { provider: string | null; enabled: boolean; provider_config?: { strategy?: string } };
     expect(mcpYaml.enabled).toBe(true);
     expect(mcpYaml.provider).toBe("custom");
+    expect(mcpYaml.provider_config?.strategy).toBe("delegate");
   });
 
   it("returns no-op sync warning when provider is not connected", () => {

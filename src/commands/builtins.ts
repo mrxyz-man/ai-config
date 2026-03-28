@@ -775,7 +775,7 @@ export const builtInCommands: CommandDefinition[] = [
               return;
             }
 
-            const validProviders = ["gitlab", "custom"];
+            const validProviders = ["custom"];
             if (!validProviders.includes(provider)) {
               const envelope = createEnvelope({
                 ok: false,
@@ -808,7 +808,7 @@ export const builtInCommands: CommandDefinition[] = [
             }
 
             const report = context.mcpIntegration.connect(targetDir, {
-              provider: provider as "gitlab" | "custom",
+              provider: provider as "custom",
               mode: options.mode ?? "hybrid"
             });
             const envelope = createEnvelope({

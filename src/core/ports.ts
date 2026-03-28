@@ -138,7 +138,7 @@ export interface ConfigExplainerPort {
   explain(projectRoot: string, options?: { key?: string; module?: string }): ExplainReport;
 }
 
-export type McpProviderName = "gitlab" | "custom";
+export type McpProviderName = "custom";
 export type TaskMode = "local" | "hybrid" | "remote-first";
 export type McpSyncDirection = "none" | "push" | "pull" | "bidirectional";
 
