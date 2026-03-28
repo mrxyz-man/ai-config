@@ -64,7 +64,8 @@
 ## Known Limitations
 
 - MCP GitLab adapter is a skeleton and does not perform real remote sync yet.
-- `tasks sync` currently reports provider skeleton limitations until adapter implementation.
+- `tasks sync` without connected MCP provider is a safe no-op with warning (local workflow continues).
+- `tasks sync` with connected provider currently reports provider skeleton limitations until adapter implementation.
 - `text check` is focused on config-local reliability signals; broader repository scanning is not enabled.
 - Questionnaire `run` currently updates status/language and does not perform interactive interviewing.
 
