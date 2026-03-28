@@ -1,0 +1,39 @@
+{
+  "name": "ai-config",
+  "version": "0.1.0",
+  "description": "Configuration and synchronization system for AI agents",
+  "private": true,
+  "type": "commonjs",
+  "bin": {
+    "ai-config": "dist/cli.js"
+  },
+  "engines": {
+    "node": ">=24.14.0 <25",
+    "npm": ">=11"
+  },
+  "scripts": {
+    "dev": "ts-node src/cli.ts",
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "lint": "eslint \"src/**/*.ts\"",
+    "lint:fix": "eslint \"src/**/*.ts\" --fix",
+    "test": "node --test dist/**/*.test.js",
+    "test:watch": "node --test --watch dist/**/*.test.js",
+    "check": "npm run typecheck && npm run lint && npm run build && npm run test",
+    "clean": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\""
+  },
+  "dependencies": {
+    "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@stylistic/eslint-plugin": "^2.13.0",
+    "@types/node": "^24.10.0",
+    "@typescript-eslint/eslint-plugin": "^8.57.2",
+    "@typescript-eslint/parser": "^8.57.2",
+    "eslint": "^9.39.4",
+    "globals": "^16.4.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.3"
+  }
+}

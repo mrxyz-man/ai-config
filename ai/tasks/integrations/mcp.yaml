@@ -1,0 +1,6 @@
+enabled: false
+provider: null
+mode: "local"
+sync_direction: "none"
+notes: "Enable later for hybrid or remote-first task sync."
+

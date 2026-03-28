@@ -1,0 +1,22 @@
+tasks:
+  - id: "T1"
+    title: "Initialize runtime and package baseline"
+    type: "task"
+    priority: "P0"
+    status: "done"
+    dependencies: []
+    completed_at: "2026-03-28"
+  - id: "T2"
+    title: "Add repository hygiene baseline (.editorconfig/.gitignore/.env)"
+    type: "task"
+    priority: "P0"
+    status: "done"
+    dependencies: ["T1"]
+    completed_at: "2026-03-28"
+  - id: "T3"
+    title: "Set up linting (including style formatting via ESLint) and CI quality gates"
+    type: "task"
+    priority: "P0"
+    status: "done"
+    dependencies: ["T1", "T2"]
+    completed_at: "2026-03-28"

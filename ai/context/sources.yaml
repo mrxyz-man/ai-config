@@ -1,0 +1,18 @@
+priority_sources:
+  - "docs/AI-CONFIG-SYSTEM-SPEC.md"
+  - "docs/PRE-DEV-CHECKLIST.md"
+  - "docs/CLI-CONTRACTS-V1.md"
+  - "docs/IMPLEMENTATION-PLAN-V1.md"
+  - "docs/SPRINT-1-TASKS.md"
+  - "ai/**"
+
+fallback_sources:
+  - "README.md"
+  - "docs/**"
+
+external_documentation:
+  use_context7_for_up_to_date_docs: true
+  policy:
+    - "When implementation requires current library/framework API details, query context7 first."
+    - "Prefer primary official documentation returned via context7."
+    - "If context7 is unavailable, proceed with local docs and explicitly mark assumptions."

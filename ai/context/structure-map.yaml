@@ -1,0 +1,13 @@
+paths:
+  root: "."
+  specs: "./docs/AI-CONFIG-SYSTEM-SPEC.md"
+  checklist: "./docs/PRE-DEV-CHECKLIST.md"
+  cli_contracts: "./docs/CLI-CONTRACTS-V1.md"
+  implementation_plan: "./docs/IMPLEMENTATION-PLAN-V1.md"
+  sprint_tasks: "./docs/SPRINT-1-TASKS.md"
+  ai_config_root: "./ai"
+  custom_area: "./ai/custom"
+
+notes:
+  - "Prefer config-driven decisions."
+  - "Do not overwrite user custom area during sync."

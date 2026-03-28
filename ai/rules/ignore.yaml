@@ -1,0 +1,20 @@
+version: "1.0"
+ignore:
+  - ".git/**"
+  - ".idea/**"
+  - ".vscode/**"
+  - "node_modules/**"
+  - "dist/**"
+  - "build/**"
+  - "coverage/**"
+  - "**/*.log"
+  - "**/*.tmp"
+
+allowlist_overrides:
+  - "docs/AI-CONFIG-SYSTEM-SPEC.md"
+  - "docs/PRE-DEV-CHECKLIST.md"
+  - "docs/CLI-CONTRACTS-V1.md"
+  - "docs/IMPLEMENTATION-PLAN-V1.md"
+  - "docs/SPRINT-1-TASKS.md"
+  - "docs/**"
+  - "ai/**"

@@ -1,0 +1,14 @@
+version: "1.0"
+default_role: "developer"
+enabled_roles:
+  - architect
+  - developer
+  - reviewer
+
+execution_order:
+  - architect
+  - developer
+  - reviewer
+
+task_first_mode: true
+

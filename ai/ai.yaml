@@ -1,0 +1,24 @@
+schema_version: "1.0"
+project_id: "ai-config"
+profile: "software-product"
+default_language: "ru"
+fallback_language: "en"
+timezone: "Asia/Yekaterinburg"
+
+modules:
+  project: true
+  context: true
+  rules: true
+  agents: true
+  tasks: true
+  text: true
+  questions: true
+  instructions: true
+  custom: true
+  state: true
+
+execution:
+  mode: "tool-calling"
+  policy_profile: "balanced"
+  require_confirmation_for_mutations: true
+

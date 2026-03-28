@@ -1,0 +1,26 @@
+name: "ai-config"
+type: "cli-platform"
+domains:
+  - "developer-tools"
+  - "ai-systems"
+
+runtime_environment:
+  shell: "powershell"
+  os_family: "windows"
+  timezone: "Asia/Yekaterinburg"
+
+repository_map:
+  docs:
+    - "docs/AI-CONFIG-SYSTEM-SPEC.md"
+    - "docs/PRE-DEV-CHECKLIST.md"
+    - "docs/CLI-CONTRACTS-V1.md"
+    - "docs/IMPLEMENTATION-PLAN-V1.md"
+    - "docs/SPRINT-1-TASKS.md"
+  ai_root: "./ai"
+  custom_root: "./ai/custom"
+
+engineering_goals:
+  - "deterministic configuration resolution"
+  - "safe sync without custom data loss"
+  - "modular architecture and extensibility"
+  - "human-in-the-loop tool-calling safety"

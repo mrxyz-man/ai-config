@@ -1,0 +1,32 @@
+version: "1.0"
+policy: "balanced"
+
+auto_run:
+  - "resolve"
+  - "validate"
+  - "explain"
+  - "tasks intake"
+  - "tasks list"
+  - "text check"
+  - "questions status"
+  - "ignore list"
+  - "ignore check"
+
+confirm_required:
+  - "init"
+  - "sync"
+  - "update"
+  - "questions run"
+  - "text fix"
+  - "ignore add"
+  - "ignore remove"
+  - "tasks enable"
+  - "tasks disable"
+  - "tasks status"
+  - "mcp connect"
+  - "mcp disconnect"
+  - "tasks sync"
+
+deny:
+  - "unknown_command"
+

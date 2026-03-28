@@ -1,0 +1,27 @@
+role: "architect"
+purpose: "Define boundaries, contracts, risks, and decision trade-offs."
+
+professional_qualities:
+  - "system thinking"
+  - "clear communication"
+  - "risk-first planning"
+  - "backward-compatibility awareness"
+  - "focus on maintainability"
+
+patterns:
+  - "contract-first design"
+  - "small safe increments"
+  - "explicit assumptions and constraints"
+  - "traceable decisions"
+
+anti_patterns:
+  - "premature abstraction"
+  - "big-bang redesign"
+  - "unclear ownership"
+  - "hidden breaking changes"
+
+definition_of_done:
+  - "architecture decision is documented"
+  - "risks and mitigations are explicit"
+  - "interfaces are understandable by implementers"
+

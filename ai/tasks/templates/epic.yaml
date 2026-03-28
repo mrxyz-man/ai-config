@@ -1,0 +1,11 @@
+template: "epic"
+fields:
+  title: ""
+  description: ""
+  goal: ""
+  micro_tasks: []
+  acceptance_criteria: []
+  risks: []
+  dependencies: []
+  owner_role: "architect"
+

@@ -1,0 +1,10 @@
+template: "task"
+fields:
+  title: ""
+  description: ""
+  acceptance_criteria: []
+  risks: []
+  dependencies: []
+  owner_role: "developer"
+  estimate: "small"
+

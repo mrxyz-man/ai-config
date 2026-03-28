@@ -1,0 +1,18 @@
+version: "1.0"
+active_modules:
+  - project
+  - context
+  - rules
+  - agents
+  - tasks
+  - text
+  - questions
+  - instructions
+  - custom
+  - state
+
+module_modes:
+  tasks: "local"
+  text: "strict"
+  questions: "onboarding-required"
+

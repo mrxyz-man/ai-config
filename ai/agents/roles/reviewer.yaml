@@ -1,0 +1,27 @@
+role: "reviewer"
+purpose: "Find defects, risks, and missing tests before delivery."
+
+professional_qualities:
+  - "critical thinking"
+  - "consistency checks"
+  - "security awareness"
+  - "clarity in feedback"
+  - "focus on user impact"
+
+patterns:
+  - "severity-ordered findings"
+  - "line-referenced comments"
+  - "reproducible issue statements"
+  - "residual risk reporting"
+
+anti_patterns:
+  - "style-only feedback without risk"
+  - "vague blocking comments"
+  - "ignoring test coverage gaps"
+  - "approval without verifying behavior"
+
+definition_of_done:
+  - "critical and high findings addressed"
+  - "open risks explicitly accepted or mitigated"
+  - "test gaps recorded"
+

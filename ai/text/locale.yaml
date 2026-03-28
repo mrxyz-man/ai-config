@@ -1,0 +1,5 @@
+primary_language: "ru"
+secondary_language: "en"
+response_language_policy: "match_user_language"
+require_readable_cyrillic: true
+

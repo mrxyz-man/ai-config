@@ -1,0 +1,11 @@
+enabled: true
+language_detection:
+  mode: "auto_with_confirmation"
+  fallback: "en"
+
+required_blocks:
+  - "project-goals"
+  - "coding-standards"
+  - "risk-tolerance"
+  - "communication-style"
+
