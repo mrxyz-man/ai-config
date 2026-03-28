@@ -282,18 +282,19 @@ export class TaskMcpIntegrationService implements TaskMcpIntegrationPort {
       const mcpConfig = readMcpConfig(projectRoot);
       if (!mcpConfig.enabled || !mcpConfig.provider) {
         return {
-          ok: false,
+          ok: true,
           provider: null,
-          mode: "local",
-          syncDirection: "none",
+          mode: mcpConfig.mode,
+          syncDirection: mcpConfig.sync_direction,
           updatedFiles: [],
-          warnings: [],
-          errors: [
+          warnings: [
             {
               file: MCP_CONFIG_PATH,
-              message: "MCP sync is not enabled. Run `ai-config mcp connect <provider>` first."
+              message:
+                "MCP provider is not connected. Sync skipped; local task workflow remains active."
             }
-          ]
+          ],
+          errors: []
         };
       }
 
@@ -358,4 +359,3 @@ export class TaskMcpIntegrationService implements TaskMcpIntegrationPort {
     }
   }
 }
-

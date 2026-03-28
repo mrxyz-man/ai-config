@@ -61,14 +61,14 @@ describe("TaskMcpIntegrationService", () => {
     expect(tasksYaml.mode).toBe("local");
   });
 
-  it("returns sync error when provider is not connected", () => {
+  it("returns no-op sync warning when provider is not connected", () => {
     const projectRoot = createTempProject();
     const service = new TaskMcpIntegrationService();
 
     const report = service.sync(projectRoot);
 
-    expect(report.ok).toBe(false);
-    expect(report.errors[0]?.message).toContain("not enabled");
+    expect(report.ok).toBe(true);
+    expect(report.errors).toHaveLength(0);
+    expect(report.warnings[0]?.message).toContain("Sync skipped");
   });
 });
-
