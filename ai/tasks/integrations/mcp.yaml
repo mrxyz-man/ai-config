@@ -3,4 +3,10 @@ provider: null
 mode: "local"
 sync_direction: "none"
 notes: "Enable later for hybrid or remote-first task sync."
-
+provider_config:
+  strategy: "delegate"
+  reconciliation:
+    conflict_strategy: "latest-timestamp"
+    timestamp_field: "updated_at"
+    on_equal_timestamp: "prefer-external"
+    dedupe_by_id: true

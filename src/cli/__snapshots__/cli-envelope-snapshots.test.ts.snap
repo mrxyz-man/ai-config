@@ -24,7 +24,6 @@ exports[`CLI JSON envelope snapshots questions status envelope shape is stable 1
     "enabled": true,
     "language": "ru",
     "missingBlocks": [
-      "project-goals",
       "coding-standards",
     ],
   },

@@ -259,6 +259,95 @@ describe("CLI contract + e2e smoke", () => {
     expect(inbox).toContain("Implement healthcheck endpoint");
   });
 
+  it("tasks plan generates plan details for existing task", () => {
+    const tempProject = createTempProjectWithAiConfig();
+    const intake = runCliJson([
+      "tasks",
+      "intake",
+      "Epic: migrate task board architecture",
+      "--type",
+      "epic",
+      "--cwd",
+      tempProject,
+      "--format",
+      "json"
+    ]);
+    const taskId = intake.envelope.data.task
+      ? (intake.envelope.data.task as { id: string }).id
+      : "";
+
+    const result = runCliJson(["tasks", "plan", taskId, "--cwd", tempProject, "--format", "json"]);
+
+    expect(result.status).toBe(0);
+    expect(result.envelope.ok).toBe(true);
+    expect(result.envelope.command).toBe("tasks plan");
+    expect(Array.isArray((result.envelope.data.task as { acceptance_criteria?: unknown[] }).acceptance_criteria)).toBe(true);
+  });
+
+  it("tasks status requires confirmation", () => {
+    const tempProject = createTempProjectWithAiConfig();
+    const intake = runCliJson([
+      "tasks",
+      "intake",
+      "Move me to ready",
+      "--cwd",
+      tempProject,
+      "--format",
+      "json"
+    ]);
+    const taskId = intake.envelope.data.task
+      ? (intake.envelope.data.task as { id: string }).id
+      : "";
+
+    const result = runCliJson([
+      "tasks",
+      "status",
+      taskId,
+      "ready",
+      "--cwd",
+      tempProject,
+      "--format",
+      "json"
+    ]);
+
+    expect(result.status).toBe(5);
+    expect(result.envelope.ok).toBe(false);
+    expect(result.envelope.command).toBe("tasks status");
+  });
+
+  it("tasks status moves task through valid transition", () => {
+    const tempProject = createTempProjectWithAiConfig();
+    const intake = runCliJson([
+      "tasks",
+      "intake",
+      "Move me to ready with confirm",
+      "--cwd",
+      tempProject,
+      "--format",
+      "json"
+    ]);
+    const taskId = intake.envelope.data.task
+      ? (intake.envelope.data.task as { id: string }).id
+      : "";
+
+    const result = runCliJson([
+      "tasks",
+      "status",
+      taskId,
+      "ready",
+      "--cwd",
+      tempProject,
+      "--confirm",
+      "--format",
+      "json"
+    ]);
+
+    expect(result.status).toBe(0);
+    expect(result.envelope.ok).toBe(true);
+    expect(result.envelope.command).toBe("tasks status");
+    expect(result.envelope.data.toStatus).toBe("ready");
+  });
+
   it("questions status returns JSON envelope", () => {
     const tempProject = createTempProjectWithAiConfig();
     const result = runCliJson(["questions", "status", "--cwd", tempProject, "--format", "json"]);
@@ -297,6 +386,121 @@ describe("CLI contract + e2e smoke", () => {
     expect(result.envelope.data.language).toBe("en");
   });
 
+  it("questions run --non-interactive fails when required blocks are unresolved", () => {
+    const tempProject = createTempProjectWithAiConfig();
+    fs.writeFileSync(
+      path.join(tempProject, "ai/questions/answers.yaml"),
+      `language_confirmed: "en"
+completed: false
+answers: []
+last_updated: "2026-03-28"
+`,
+      "utf8"
+    );
+
+    const result = runCliJson([
+      "questions",
+      "run",
+      "--cwd",
+      tempProject,
+      "--confirm",
+      "--non-interactive",
+      "--format",
+      "json"
+    ]);
+
+    expect(result.status).toBe(5);
+    expect(result.envelope.ok).toBe(false);
+    expect(result.envelope.command).toBe("questions run");
+    expect(Array.isArray(result.envelope.data.missingBlocks)).toBe(true);
+    expect((result.envelope.data.missingBlocks as unknown[]).length).toBeGreaterThan(0);
+  });
+
+  it("questions run --answer resolves required blocks in non-interactive mode", () => {
+    const tempProject = createTempProjectWithAiConfig();
+    fs.writeFileSync(
+      path.join(tempProject, "ai/questions/answers.yaml"),
+      `language_confirmed: "en"
+completed: false
+answers: []
+last_updated: "2026-03-28"
+`,
+      "utf8"
+    );
+
+    const result = runCliJson([
+      "questions",
+      "run",
+      "--cwd",
+      tempProject,
+      "--confirm",
+      "--non-interactive",
+      "--answer",
+      "q1=Goal",
+      "--answer",
+      "q2=Standards",
+      "--answer",
+      "risk-tolerance=Low risk",
+      "--answer",
+      "communication-style=Structured",
+      "--format",
+      "json"
+    ]);
+
+    expect(result.status).toBe(0);
+    expect(result.envelope.ok).toBe(true);
+    expect(result.envelope.command).toBe("questions run");
+    expect(result.envelope.data.completed).toBe(true);
+    expect(Array.isArray(result.envelope.data.missingBlocks)).toBe(true);
+    expect((result.envelope.data.missingBlocks as unknown[]).length).toBe(0);
+  });
+
+  it("questions ask without --confirm is blocked by policy", () => {
+    const tempProject = createTempProjectWithAiConfig();
+    const result = runCliJson(["questions", "ask", "--cwd", tempProject, "--format", "json"]);
+
+    expect(result.status).toBe(5);
+    expect(result.envelope.ok).toBe(false);
+    expect(result.envelope.command).toBe("questions ask");
+  });
+
+  it("questions ask with provided answers can complete questionnaire", () => {
+    const tempProject = createTempProjectWithAiConfig();
+    fs.writeFileSync(
+      path.join(tempProject, "ai/questions/answers.yaml"),
+      `language_confirmed: "en"
+completed: false
+answers: []
+last_updated: "2026-03-28"
+`,
+      "utf8"
+    );
+
+    const result = runCliJson([
+      "questions",
+      "ask",
+      "--cwd",
+      tempProject,
+      "--confirm",
+      "--non-interactive",
+      "--answer",
+      "q1=Goal",
+      "--answer",
+      "q2=Standards",
+      "--answer",
+      "risk-tolerance=Low risk",
+      "--answer",
+      "communication-style=Structured",
+      "--format",
+      "json"
+    ]);
+
+    expect(result.status).toBe(0);
+    expect(result.envelope.ok).toBe(true);
+    expect(result.envelope.command).toBe("questions ask");
+    expect(result.envelope.data.completed).toBe(true);
+  });
+
   it("text check returns JSON envelope", () => {
     const tempProject = createTempProjectWithAiConfig();
     fs.writeFileSync(
@@ -309,6 +513,23 @@ describe("CLI contract + e2e smoke", () => {
 
     expect(result.envelope.command).toBe("text check");
     expect(typeof result.envelope.ok).toBe("boolean");
+  });
+
+  it("text check supports --changed-only with safe fallback", () => {
+    const tempProject = createTempProjectWithAiConfig();
+    const result = runCliJson([
+      "text",
+      "check",
+      "--cwd",
+      tempProject,
+      "--changed-only",
+      "--format",
+      "json"
+    ]);
+
+    expect(result.envelope.command).toBe("text check");
+    expect(typeof result.envelope.ok).toBe("boolean");
+    expect(result.envelope.data.scanMode).toBe("repository");
   });
 
   it("sync with --confirm and --dry-run returns planned changes only", () => {

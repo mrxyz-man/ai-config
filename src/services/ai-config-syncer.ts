@@ -6,6 +6,9 @@ import YAML from "yaml";
 import { ConfigResolverPort, ConfigSyncPort, SyncIssue, SyncReport } from "../core/ports";
 
 const TEMPLATE_AI_DIR = path.resolve(__dirname, "../../ai");
+const TEMPLATE_AI_CONFIG_PATH = path.join(TEMPLATE_AI_DIR, "ai.yaml");
+const MIGRATION_STATE_PATH = "ai/state/migration-state.yaml";
+const AI_CONFIG_PATH = "ai/ai.yaml";
 
 const MANAGED_ROOTS = [
   "ai/ai.yaml",
@@ -17,9 +20,7 @@ const MANAGED_ROOTS = [
   "ai/questions",
   "ai/text",
   "ai/tasks",
-  "ai/agents",
-  "ai/state/sync-state.yaml",
-  "ai/lock.yaml"
+  "ai/agents"
 ];
 
 const isUnderCustom = (relativePath: string): boolean =>
@@ -96,6 +97,182 @@ const collectCustomFiles = (projectRoot: string): string[] => {
   return listFilesRecursively(customDir).map((absolutePath) => toRelative(projectRoot, absolutePath));
 };
 
+type MigrationRecord = {
+  from: string;
+  to: string;
+  applied_at: string;
+  steps: string[];
+};
+
+type MigrationState = {
+  version: string;
+  current_version: string;
+  last_migrated_at: string | null;
+  history: MigrationRecord[];
+};
+
+type MigrationContext = {
+  projectRoot: string;
+  appliedChanges: string[];
+};
+
+type MigrationStep = {
+  from: string;
+  to: string;
+  run: (context: MigrationContext) => string[];
+};
+
+const parseVersion = (value: string): [number, number] | null => {
+  const match = /^(\d+)\.(\d+)$/.exec(value.trim());
+  if (!match) {
+    return null;
+  }
+  return [Number.parseInt(match[1], 10), Number.parseInt(match[2], 10)];
+};
+
+const compareVersions = (a: string, b: string): number => {
+  const left = parseVersion(a);
+  const right = parseVersion(b);
+  if (!left || !right) {
+    return a.localeCompare(b);
+  }
+  if (left[0] !== right[0]) {
+    return left[0] - right[0];
+  }
+  return left[1] - right[1];
+};
+
+const readSchemaVersion = (projectRoot: string): string | null => {
+  const aiConfigPath = path.join(projectRoot, AI_CONFIG_PATH);
+  if (!fs.existsSync(aiConfigPath)) {
+    return null;
+  }
+  try {
+    const parsed = YAML.parse(fs.readFileSync(aiConfigPath, "utf8")) as Record<string, unknown> | null;
+    if (parsed && typeof parsed.schema_version === "string") {
+      return parsed.schema_version;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+const readTemplateVersion = (): string => {
+  const parsed = YAML.parse(fs.readFileSync(TEMPLATE_AI_CONFIG_PATH, "utf8")) as
+    | Record<string, unknown>
+    | null;
+  if (parsed && typeof parsed.schema_version === "string") {
+    return parsed.schema_version;
+  }
+  return "1.0";
+};
+
+const readMigrationState = (projectRoot: string, fallbackVersion: string): MigrationState => {
+  const absolutePath = path.join(projectRoot, MIGRATION_STATE_PATH);
+  if (!fs.existsSync(absolutePath)) {
+    return {
+      version: "1.0",
+      current_version: fallbackVersion,
+      last_migrated_at: null,
+      history: []
+    };
+  }
+
+  try {
+    const parsed = YAML.parse(fs.readFileSync(absolutePath, "utf8")) as Partial<MigrationState> | null;
+    return {
+      version: typeof parsed?.version === "string" ? parsed.version : "1.0",
+      current_version:
+        typeof parsed?.current_version === "string" ? parsed.current_version : fallbackVersion,
+      last_migrated_at: typeof parsed?.last_migrated_at === "string" ? parsed.last_migrated_at : null,
+      history: Array.isArray(parsed?.history) ? (parsed?.history as MigrationRecord[]) : []
+    };
+  } catch {
+    return {
+      version: "1.0",
+      current_version: fallbackVersion,
+      last_migrated_at: null,
+      history: []
+    };
+  }
+};
+
+const writeYamlAtomic = (absolutePath: string, value: unknown): void => {
+  fs.mkdirSync(path.dirname(absolutePath), { recursive: true });
+  const temp = `${absolutePath}.tmp`;
+  fs.writeFileSync(temp, YAML.stringify(value), "utf8");
+  if (fs.existsSync(absolutePath)) {
+    fs.rmSync(absolutePath, { force: true });
+  }
+  fs.renameSync(temp, absolutePath);
+};
+
+const writeMigrationState = (projectRoot: string, state: MigrationState, appliedChanges: string[]): void => {
+  const absolutePath = path.join(projectRoot, MIGRATION_STATE_PATH);
+  writeYamlAtomic(absolutePath, state);
+  appliedChanges.push(MIGRATION_STATE_PATH);
+};
+
+const readYamlRecordSafe = (
+  absolutePath: string,
+  fallback: Record<string, unknown>,
+  warnings: SyncIssue[],
+  relativeFilePath: string
+): Record<string, unknown> => {
+  try {
+    const parsed = YAML.parse(fs.readFileSync(absolutePath, "utf8"));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      warnings.push({
+        file: relativeFilePath,
+        message: "Malformed YAML object; fallback object was used during sync"
+      });
+      return { ...fallback };
+    }
+    return parsed as Record<string, unknown>;
+  } catch {
+    warnings.push({
+      file: relativeFilePath,
+      message: "Failed to parse YAML; fallback object was used during sync"
+    });
+    return { ...fallback };
+  }
+};
+
+const migrationStep_0_9_to_1_0: MigrationStep = {
+  from: "0.9",
+  to: "1.0",
+  run: () => [
+    "migrated schema baseline from 0.9 to 1.0",
+    "initialized migration state tracking"
+  ]
+};
+
+const MIGRATION_STEPS: MigrationStep[] = [migrationStep_0_9_to_1_0];
+
+const resolveMigrationPath = (fromVersion: string, toVersion: string): MigrationStep[] | null => {
+  if (fromVersion === toVersion) {
+    return [];
+  }
+
+  const steps: MigrationStep[] = [];
+  let cursor = fromVersion;
+  const guard = 16;
+  for (let index = 0; index < guard; index += 1) {
+    const next = MIGRATION_STEPS.find((step) => step.from === cursor);
+    if (!next) {
+      return null;
+    }
+    steps.push(next);
+    cursor = next.to;
+    if (cursor === toVersion) {
+      return steps;
+    }
+  }
+
+  return null;
+};
+
 export class AiConfigSyncer implements ConfigSyncPort {
   constructor(private readonly resolver: ConfigResolverPort) {}
 
@@ -130,11 +307,75 @@ export class AiConfigSyncer implements ConfigSyncPort {
       };
     }
 
-    if (options?.withMigrations) {
-      migrationSummary.push("with-migrations flag accepted (no-op in current v1 baseline)");
+    const targetVersion = readTemplateVersion();
+    const detectedVersion = readSchemaVersion(absoluteRoot) ?? targetVersion;
+    const sourceVersion = options?.fromVersion ?? detectedVersion;
+    const migrationSteps = resolveMigrationPath(sourceVersion, targetVersion);
+
+    if (compareVersions(sourceVersion, targetVersion) > 0) {
+      errors.push({
+        file: AI_CONFIG_PATH,
+        path: "schema_version",
+        message: `Source version ${sourceVersion} is newer than supported target ${targetVersion}`
+      });
+      return {
+        ok: false,
+        dryRun,
+        appliedChanges,
+        plannedChanges,
+        preservedCustomFiles,
+        migrationSummary,
+        warnings,
+        errors
+      };
     }
+
+    if (sourceVersion !== targetVersion) {
+      if (!options?.withMigrations) {
+        errors.push({
+          file: AI_CONFIG_PATH,
+          path: "schema_version",
+          message: `Version mismatch (${sourceVersion} -> ${targetVersion}) requires --with-migrations`
+        });
+        return {
+          ok: false,
+          dryRun,
+          appliedChanges,
+          plannedChanges,
+          preservedCustomFiles,
+          migrationSummary,
+          warnings,
+          errors
+        };
+      }
+
+      if (!migrationSteps) {
+        errors.push({
+          file: AI_CONFIG_PATH,
+          path: "schema_version",
+          message: `No compatible migration path from ${sourceVersion} to ${targetVersion}`
+        });
+        return {
+          ok: false,
+          dryRun,
+          appliedChanges,
+          plannedChanges,
+          preservedCustomFiles,
+          migrationSummary,
+          warnings,
+          errors
+        };
+      }
+
+      migrationSummary.push(
+        `migration required: ${sourceVersion} -> ${targetVersion} (${migrationSteps.length} step(s))`
+      );
+    } else if (options?.withMigrations) {
+      migrationSummary.push("with-migrations enabled: no migration required (already on target version)");
+    }
+
     if (options?.fromVersion) {
-      migrationSummary.push(`from-version hint received: ${options.fromVersion}`);
+      migrationSummary.push(`from-version override: ${options.fromVersion}`);
     }
 
     for (const managedPath of MANAGED_ROOTS) {
@@ -144,9 +385,32 @@ export class AiConfigSyncer implements ConfigSyncPort {
     }
 
     if (!dryRun) {
+      if (sourceVersion !== targetVersion && migrationSteps) {
+        const migrationState = readMigrationState(absoluteRoot, sourceVersion);
+        for (const step of migrationSteps) {
+          const stepMessages = step.run({ projectRoot: absoluteRoot, appliedChanges });
+          const now = new Date().toISOString();
+          migrationState.history.push({
+            from: step.from,
+            to: step.to,
+            applied_at: now,
+            steps: stepMessages
+          });
+          migrationState.current_version = step.to;
+          migrationState.last_migrated_at = now;
+          migrationSummary.push(...stepMessages.map((message) => `${step.from}->${step.to}: ${message}`));
+        }
+        writeMigrationState(absoluteRoot, migrationState, appliedChanges);
+      }
+
       const syncStatePath = path.join(absoluteRoot, "ai/state/sync-state.yaml");
       if (fs.existsSync(syncStatePath)) {
-        const syncState = YAML.parse(fs.readFileSync(syncStatePath, "utf8")) as Record<string, unknown>;
+        const syncState = readYamlRecordSafe(
+          syncStatePath,
+          { schema_version: "1.0", last_sync_at: null, last_sync_result: null },
+          warnings,
+          "ai/state/sync-state.yaml"
+        );
         syncState.last_sync_at = new Date().toISOString();
         syncState.last_sync_result = "sync_completed";
         fs.writeFileSync(syncStatePath, YAML.stringify(syncState), "utf8");
@@ -155,8 +419,14 @@ export class AiConfigSyncer implements ConfigSyncPort {
 
       const lockPath = path.join(absoluteRoot, "ai/lock.yaml");
       if (fs.existsSync(lockPath)) {
-        const lock = YAML.parse(fs.readFileSync(lockPath, "utf8")) as Record<string, unknown>;
+        const lock = readYamlRecordSafe(
+          lockPath,
+          { schema_version: targetVersion, locked_at: null, modules: {} },
+          warnings,
+          "ai/lock.yaml"
+        );
         lock.locked_at = new Date().toISOString();
+        lock.schema_version = targetVersion;
         lock.modules = { source: "template-sync-v1" };
         fs.writeFileSync(lockPath, YAML.stringify(lock), "utf8");
         appliedChanges.push("ai/lock.yaml");
@@ -193,4 +463,3 @@ export class AiConfigSyncer implements ConfigSyncPort {
     };
   }
 }
-

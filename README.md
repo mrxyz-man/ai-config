@@ -12,7 +12,7 @@ Configuration and synchronization system for AI agents in software projects.
 ```bash
 npm install
 npm run check
-npm run dev
+npm run dev -- --help
 ```
 
 ## Main Scripts
@@ -30,12 +30,43 @@ npm run dev
 - Singleton boundaries are explicitly defined in [docs/SINGLETON-BOUNDARIES.md](./docs/SINGLETON-BOUNDARIES.md), including test reset hooks.
 - Tool-calling policy and audit hooks are enforced through dedicated services (`ToolCallingPolicyGate`, `YamlAuditLogger`).
 
-## Sprint Status
+## Implemented Command Surface
+
+- Core:
+  - `init`
+  - `sync`
+  - `resolve`
+  - `validate`
+  - `explain`
+- Tasks:
+  - `tasks enable`
+  - `tasks disable`
+  - `tasks intake "<text>"`
+  - `tasks plan <task-id>`
+  - `tasks status <task-id> <status>`
+  - `tasks list [--status]`
+  - `tasks sync`
+- Text:
+  - `text check [--changed-only]`
+- Questions:
+  - `questions status`
+  - `questions run [--lang|--profile|--answer|--non-interactive]`
+  - `questions ask [--lang|--profile|--answer|--non-interactive]`
+- MCP:
+  - `mcp status`
+  - `mcp connect custom [--mode local|hybrid|remote-first]`
+  - `mcp disconnect`
+
+## Status References
 
 - Sprint 1 handoff: [docs/SPRINT-1-HANDOFF.md](./docs/SPRINT-1-HANDOFF.md)
-- Sprint 2 proposed backlog: [docs/SPRINT-2-BACKLOG.md](./docs/SPRINT-2-BACKLOG.md)
+- Sprint 2 handoff: [docs/SPRINT-2-HANDOFF.md](./docs/SPRINT-2-HANDOFF.md)
+- Sprint 2 backlog: [docs/SPRINT-2-BACKLOG.md](./docs/SPRINT-2-BACKLOG.md)
+- CLI contracts: [docs/CLI-CONTRACTS-V1.md](./docs/CLI-CONTRACTS-V1.md)
+- RC checklist: [docs/V1-RC-CHECKLIST.md](./docs/V1-RC-CHECKLIST.md)
 
 ## Current Limitations
 
-- `sync` and `explain` are policy-aware stubs (not fully implemented yet).
-- Resolver currently targets baseline v1 behavior and will be extended with richer merge semantics in Sprint 2.
+- `sync --with-migrations` currently accepts migration flags but does not execute full versioned migration steps yet.
+- MCP provider model is `custom`-first and user-managed; production adapters beyond `custom` are not bundled.
+- Command surface from long-term spec (`ignore`, `text fix/doctor`, `questions reset`, `agents`, `doctor`, `diff`) is not part of current v1 implemented scope.

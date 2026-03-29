@@ -24,19 +24,21 @@ const DEFAULT_POLICY: ToolCallingPolicyFile = {
     "mcp status",
     "tasks intake",
     "tasks list",
+    "tasks plan",
     "text check",
     "questions status"
   ],
   confirm_required: [
     "init",
     "sync",
-    "update",
     "mcp connect",
     "mcp disconnect",
     "tasks sync",
     "tasks enable",
     "tasks disable",
-    "questions run"
+    "tasks status",
+    "questions run",
+    "questions ask"
   ],
   deny: ["unknown_command"]
 };

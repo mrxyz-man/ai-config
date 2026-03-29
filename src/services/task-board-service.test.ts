@@ -71,4 +71,53 @@ describe("TaskBoardService", () => {
     expect(inboxOnly.ok).toBe(true);
     expect(inboxOnly.tasks.every((task) => task.status === "inbox")).toBe(true);
   });
+
+  it("plans epic task and generates derived subtasks", () => {
+    const projectRoot = createTempProject();
+    const service = new TaskBoardService();
+
+    const intake = service.intake(projectRoot, { text: "Epic: redesign task workflow", type: "epic" });
+    expect(intake.ok).toBe(true);
+    const taskId = intake.task?.id;
+    expect(taskId).toBeTruthy();
+
+    const plan = service.plan(projectRoot, { taskId: taskId ?? "" });
+    expect(plan.ok).toBe(true);
+    expect(plan.task?.acceptance_criteria.length).toBeGreaterThan(0);
+    expect(plan.task?.risks.length).toBeGreaterThan(0);
+    expect(plan.generatedTasks.length).toBeGreaterThan(0);
+  });
+
+  it("changes task status with transition rules", () => {
+    const projectRoot = createTempProject();
+    const service = new TaskBoardService();
+
+    const intake = service.intake(projectRoot, { text: "Status transition task" });
+    const taskId = intake.task?.id ?? "";
+    expect(taskId).toBeTruthy();
+
+    const moveReady = service.changeStatus(projectRoot, { taskId, status: "ready" });
+    expect(moveReady.ok).toBe(true);
+    expect(moveReady.toStatus).toBe("ready");
+
+    const invalidJump = service.changeStatus(projectRoot, { taskId, status: "done" });
+    expect(invalidJump.ok).toBe(false);
+    expect(invalidJump.errors[0]?.message).toContain("Invalid transition");
+  });
+
+  it("list tolerates malformed board file and returns remaining valid tasks", () => {
+    const projectRoot = createTempProject();
+    const service = new TaskBoardService();
+    service.intake(projectRoot, { text: "Healthy inbox task" });
+
+    fs.writeFileSync(
+      path.join(projectRoot, "ai/tasks/board/review.yaml"),
+      "tasks: [broken",
+      "utf8"
+    );
+
+    const report = service.list(projectRoot);
+    expect(report.ok).toBe(true);
+    expect(report.tasks.some((task) => task.title.includes("Healthy inbox task"))).toBe(true);
+  });
 });

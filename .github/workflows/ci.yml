@@ -8,7 +8,15 @@ on:
 
 jobs:
   quality:
-    runs-on: ubuntu-latest
+    name: quality (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,4 +32,3 @@ jobs:
 
       - name: Run quality checks
         run: npm run check
-

@@ -25,11 +25,11 @@
   - provider interface contract
   - `mcp status|connect|disconnect`
   - `tasks sync`
-  - custom provider skeleton (health/sync stubs)
+  - custom provider strategy with local/external task reconciliation (push/pull/bidirectional)
 - Module minimums (M5):
-  - `tasks enable|disable|intake|list`
-  - `text check`
-  - `questions status|run`
+  - `tasks enable|disable|intake|plan|status|list`
+  - `text check` (repository scope + ignore rules + changed-only mode)
+  - `questions status|run|ask` (profile-aware, interactive/non-interactive paths)
 
 ## Current Command Surface
 
@@ -43,35 +43,35 @@
   - `tasks enable`
   - `tasks disable`
   - `tasks intake "<text>"`
+  - `tasks plan <task-id>`
+  - `tasks status <task-id> <status>`
   - `tasks list [--status]`
   - `tasks sync`
 - Text:
-  - `text check`
+  - `text check [--changed-only]`
 - Questions:
   - `questions status`
-  - `questions run [--lang]`
+  - `questions run [--lang|--profile|--answer|--non-interactive]`
+  - `questions ask [--lang|--profile|--answer|--non-interactive]`
 - MCP:
   - `mcp status`
   - `mcp connect <provider> [--mode local|hybrid|remote-first]`
   - `mcp disconnect`
 
-## Quality Gate Status
+## Quality Gate Status (Current)
 
 - `npm run check`: passing
-- Test suites: 16
-- Tests: 68
+- Test suites: 18
+- Tests: 103
 
-## Known Limitations
+## Remaining Limitations
 
-- MCP adapter is a skeleton and does not perform real remote sync yet.
-- `tasks sync` without connected MCP provider is a safe no-op with warning (local workflow continues).
-- `tasks sync` with connected provider currently reports provider skeleton limitations until adapter implementation.
-- `text check` is focused on config-local reliability signals; broader repository scanning is not enabled.
-- Questionnaire `run` currently updates status/language and does not perform interactive interviewing.
+- MCP bundled support is intentionally limited to `custom` provider strategy; additional provider packs are pending.
+- Long-term spec commands (`ignore *`, `text fix/doctor`, `questions reset`, `agents *`, `doctor`, `diff`) are not in current implemented v1 scope.
 
 ## Suggested Sprint 3 Focus
 
-1. Implement real MCP provider adapter(s) and provider-specific auth/config checks.
-2. Add interactive questionnaire runner and profile-aware question orchestration.
-3. Expand text checks to repository-level scan with ignore rules integration.
-4. Harden task workflow with `plan/status` transitions and MCP reconciliation strategy.
+1. Close production documentation gap (`README`, contracts, handoff docs, RC checklist evidence).
+2. Implement full migration contract for `sync --with-migrations`.
+3. Finalize MCP reconciliation policy and adapter hardening strategy.
+4. Complete release readiness artifacts (versioning, changelog, rollback plan, CI matrix hardening).

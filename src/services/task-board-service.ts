@@ -13,6 +13,8 @@ import {
   TaskMode,
   TasksIntakeReport,
   TasksListReport,
+  TasksPlanReport,
+  TasksStatusReport,
   TasksToggleReport
 } from "../core/ports";
 
@@ -25,6 +27,14 @@ const STATUS_FILE_MAP: Record<TaskStatus, string> = {
   in_progress: "in-progress.yaml",
   review: "review.yaml",
   done: "done.yaml"
+};
+
+const STATUS_TRANSITIONS: Record<TaskStatus, TaskStatus[]> = {
+  inbox: ["ready"],
+  ready: ["inbox", "in_progress"],
+  in_progress: ["ready", "review"],
+  review: ["in_progress", "done"],
+  done: ["review"]
 };
 
 const TaskConfigSchema = z.object({
@@ -86,12 +96,16 @@ const readBoardFile = (projectRoot: string, status: TaskStatus): TasksBoardFile 
   if (!fs.existsSync(absolutePath)) {
     return { tasks: [] };
   }
-  const parsed = parseYaml(absolutePath);
-  const result = TasksBoardFileSchema.safeParse(parsed);
-  if (!result.success) {
+  try {
+    const parsed = parseYaml(absolutePath);
+    const result = TasksBoardFileSchema.safeParse(parsed);
+    if (!result.success) {
+      return { tasks: [] };
+    }
+    return result.data;
+  } catch {
     return { tasks: [] };
   }
-  return result.data;
 };
 
 const writeBoardFile = (projectRoot: string, status: TaskStatus, board: TasksBoardFile): void => {
@@ -157,6 +171,56 @@ const collectAllTasks = (projectRoot: string): TaskRecord[] => {
     all.push(...board.tasks);
   }
   return all;
+};
+
+type TaskLocation = {
+  status: TaskStatus;
+  board: TasksBoardFile;
+  index: number;
+};
+
+const findTaskLocation = (projectRoot: string, taskId: string): TaskLocation | null => {
+  for (const status of Object.keys(STATUS_FILE_MAP) as TaskStatus[]) {
+    const board = readBoardFile(projectRoot, status);
+    const index = board.tasks.findIndex((task) => task.id === taskId);
+    if (index >= 0) {
+      return { status, board, index };
+    }
+  }
+  return null;
+};
+
+const unique = <T>(items: T[]): T[] => [...new Set(items)];
+
+const buildPlanDefaults = (
+  task: TaskRecord
+): Pick<TaskRecord, "acceptance_criteria" | "risks"> => {
+  let acceptanceCriteria = task.acceptance_criteria;
+  if (acceptanceCriteria.length === 0) {
+    acceptanceCriteria = [
+      "Scope and constraints are clarified before implementation.",
+      "Implementation and tests are completed with passing quality checks.",
+      "Documentation and usage notes are updated."
+    ];
+  }
+
+  let risks = task.risks;
+  if (risks.length === 0) {
+    if (task.type === "epic") {
+      risks = [
+        "Scope creep risk.",
+        "Integration regressions risk.",
+        "Timeline slippage risk."
+      ];
+    } else {
+      risks = [
+        "Unintended regressions risk.",
+        "Edge cases may be missed without tests."
+      ];
+    }
+  }
+
+  return { acceptance_criteria: acceptanceCriteria, risks };
 };
 
 const baseToggleReport = (
@@ -337,5 +401,249 @@ export class TaskBoardService implements TaskBoardPort {
       };
     }
   }
-}
 
+  plan(projectRoot: string, input: { taskId: string }): TasksPlanReport {
+    try {
+      const config = readTaskConfig(projectRoot);
+      if (!config.enabled) {
+        return {
+          ok: false,
+          task: null,
+          generatedTasks: [],
+          updatedFiles: [],
+          warnings: [],
+          errors: [{ file: TASKS_CONFIG_PATH, message: "Tasks are disabled. Run `ai-config tasks enable`." }]
+        };
+      }
+
+      const taskId = input.taskId.trim();
+      if (!taskId) {
+        return {
+          ok: false,
+          task: null,
+          generatedTasks: [],
+          updatedFiles: [],
+          warnings: [],
+          errors: [{ file: TASKS_CONFIG_PATH, message: "taskId must not be empty" }]
+        };
+      }
+
+      const location = findTaskLocation(projectRoot, taskId);
+      if (!location) {
+        return {
+          ok: false,
+          task: null,
+          generatedTasks: [],
+          updatedFiles: [],
+          warnings: [],
+          errors: [{ file: TASKS_BOARD_DIR, message: `Task "${taskId}" not found` }]
+        };
+      }
+
+      const task = location.board.tasks[location.index];
+      const defaults = buildPlanDefaults(task);
+      task.acceptance_criteria = defaults.acceptance_criteria;
+      task.risks = defaults.risks;
+
+      const generatedTasks: TaskRecord[] = [];
+      if (task.type === "epic" && config.epic_auto_decomposition) {
+        const derivationSource = `derived-from:${task.id}`;
+        const existingDerived = collectAllTasks(projectRoot).filter(
+          (item) => item.source === derivationSource
+        );
+
+        if (existingDerived.length === 0) {
+          const allTasks = collectAllTasks(projectRoot);
+          const phases = ["Analysis", "Implementation", "Validation"];
+          const inboxBoard = readBoardFile(projectRoot, "inbox");
+          for (const phase of phases) {
+            const subTask: TaskRecord = {
+              id: nextTaskId([...allTasks, ...generatedTasks]),
+              title: `${normalizeTitle(task.title)} :: ${phase}`,
+              type: "task",
+              priority: task.priority,
+              status: "inbox",
+              description: `${phase} phase for epic ${task.id}: ${task.title}`,
+              acceptance_criteria: [],
+              risks: [],
+              dependencies: [task.id],
+              owner_role: "developer",
+              estimate: "medium",
+              created_at: new Date().toISOString(),
+              source: derivationSource
+            };
+            generatedTasks.push(subTask);
+            inboxBoard.tasks.push(subTask);
+          }
+          writeBoardFile(projectRoot, "inbox", inboxBoard);
+        }
+      }
+
+      task.dependencies = unique([...task.dependencies, ...generatedTasks.map((item) => item.id)]);
+      location.board.tasks[location.index] = task;
+      writeBoardFile(projectRoot, location.status, location.board);
+
+      const updatedFiles = [`${TASKS_BOARD_DIR}/${STATUS_FILE_MAP[location.status]}`];
+      if (generatedTasks.length > 0) {
+        updatedFiles.push(`${TASKS_BOARD_DIR}/${STATUS_FILE_MAP.inbox}`);
+      }
+
+      return {
+        ok: true,
+        task,
+        generatedTasks,
+        updatedFiles: unique(updatedFiles),
+        warnings: [],
+        errors: []
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        task: null,
+        generatedTasks: [],
+        updatedFiles: [],
+        warnings: [],
+        errors: [
+          {
+            file: TASKS_BOARD_DIR,
+            message: error instanceof Error ? error.message : "Failed to plan task"
+          }
+        ]
+      };
+    }
+  }
+
+  changeStatus(
+    projectRoot: string,
+    input: { taskId: string; status: TaskStatus }
+  ): TasksStatusReport {
+    try {
+      const config = readTaskConfig(projectRoot);
+      if (!config.enabled) {
+        return {
+          ok: false,
+          task: null,
+          fromStatus: null,
+          toStatus: null,
+          updatedFiles: [],
+          warnings: [],
+          errors: [{ file: TASKS_CONFIG_PATH, message: "Tasks are disabled. Run `ai-config tasks enable`." }]
+        };
+      }
+
+      const taskId = input.taskId.trim();
+      if (!taskId) {
+        return {
+          ok: false,
+          task: null,
+          fromStatus: null,
+          toStatus: null,
+          updatedFiles: [],
+          warnings: [],
+          errors: [{ file: TASKS_CONFIG_PATH, message: "taskId must not be empty" }]
+        };
+      }
+
+      const targetStatus = input.status;
+      if (!config.statuses.includes(targetStatus)) {
+        return {
+          ok: false,
+          task: null,
+          fromStatus: null,
+          toStatus: targetStatus,
+          updatedFiles: [],
+          warnings: [],
+          errors: [{ file: TASKS_CONFIG_PATH, message: `Status "${targetStatus}" is not enabled in config` }]
+        };
+      }
+
+      const location = findTaskLocation(projectRoot, taskId);
+      if (!location) {
+        return {
+          ok: false,
+          task: null,
+          fromStatus: null,
+          toStatus: targetStatus,
+          updatedFiles: [],
+          warnings: [],
+          errors: [{ file: TASKS_BOARD_DIR, message: `Task "${taskId}" not found` }]
+        };
+      }
+
+      const currentStatus = location.status;
+      const task = location.board.tasks[location.index];
+      if (currentStatus === targetStatus) {
+        return {
+          ok: true,
+          task,
+          fromStatus: currentStatus,
+          toStatus: targetStatus,
+          updatedFiles: [],
+          warnings: [
+            {
+              file: `${TASKS_BOARD_DIR}/${STATUS_FILE_MAP[currentStatus]}`,
+              message: `Task "${taskId}" is already in status "${targetStatus}"`
+            }
+          ],
+          errors: []
+        };
+      }
+
+      if (!STATUS_TRANSITIONS[currentStatus].includes(targetStatus)) {
+        return {
+          ok: false,
+          task,
+          fromStatus: currentStatus,
+          toStatus: targetStatus,
+          updatedFiles: [],
+          warnings: [],
+          errors: [
+            {
+              file: TASKS_BOARD_DIR,
+              message: `Invalid transition "${currentStatus}" -> "${targetStatus}"`
+            }
+          ]
+        };
+      }
+
+      location.board.tasks.splice(location.index, 1);
+      writeBoardFile(projectRoot, currentStatus, location.board);
+
+      const destination = readBoardFile(projectRoot, targetStatus);
+      const movedTask: TaskRecord = {
+        ...task,
+        status: targetStatus
+      };
+      destination.tasks.push(movedTask);
+      writeBoardFile(projectRoot, targetStatus, destination);
+
+      return {
+        ok: true,
+        task: movedTask,
+        fromStatus: currentStatus,
+        toStatus: targetStatus,
+        updatedFiles: unique([
+          `${TASKS_BOARD_DIR}/${STATUS_FILE_MAP[currentStatus]}`,
+          `${TASKS_BOARD_DIR}/${STATUS_FILE_MAP[targetStatus]}`
+        ]),
+        warnings: [],
+        errors: []
+      };
+    } catch (error) {
+      return {
+        ok: false,
+        task: null,
+        fromStatus: null,
+        toStatus: null,
+        updatedFiles: [],
+        warnings: [],
+        errors: [
+          {
+            file: TASKS_BOARD_DIR,
+            message: error instanceof Error ? error.message : "Failed to change task status"
+          }
+        ]
+      };
+    }
+  }
+}

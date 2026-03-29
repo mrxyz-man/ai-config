@@ -1,4 +1,6 @@
 import path from "node:path";
+import { stdin as input, stdout as output } from "node:process";
+import readline from "node:readline/promises";
 
 import { Command } from "commander";
 
@@ -48,6 +50,55 @@ const applyPolicy = (input: {
 
   process.exitCode = result.decision === "confirm-required" ? 5 : 1;
   return false;
+};
+
+const appendOptionValue = (value: string, previous: string[]): string[] => [...previous, value];
+
+const parseAnswerPairs = (pairs: string[]): Array<{ id: string; value: string }> => {
+  const parsed: Array<{ id: string; value: string }> = [];
+  for (const pair of pairs) {
+    const separator = pair.indexOf("=");
+    if (separator < 1) {
+      continue;
+    }
+    const id = pair.slice(0, separator).trim();
+    const value = pair.slice(separator + 1).trim();
+    if (!id || !value) {
+      continue;
+    }
+    parsed.push({ id, value });
+  }
+  return parsed;
+};
+
+type PendingQuestion = {
+  id: string;
+  blockId: string;
+  prompt: string;
+  required: boolean;
+};
+
+const collectInteractiveAnswers = async (
+  pendingQuestions: PendingQuestion[]
+): Promise<Array<{ id: string; value: string }>> => {
+  const requiredQuestions = pendingQuestions.filter((item) => item.required);
+  if (requiredQuestions.length === 0 || !input.isTTY || !output.isTTY) {
+    return [];
+  }
+
+  const terminal = readline.createInterface({ input, output });
+  const answers: Array<{ id: string; value: string }> = [];
+  try {
+    for (const question of requiredQuestions) {
+      const response = (await terminal.question(`${question.prompt} [${question.id}]: `)).trim();
+      if (response.length > 0) {
+        answers.push({ id: question.id, value: response });
+      }
+    }
+  } finally {
+    terminal.close();
+  }
+  return answers;
 };
 
 export const builtInCommands: CommandDefinition[] = [
@@ -528,46 +579,57 @@ export const builtInCommands: CommandDefinition[] = [
         .description("Run text reliability checks")
         .option("--cwd <path>", "Project root path", ".")
         .option("--format <format>", "Output format: human|json", "human")
+        .option("--changed-only", "Scan only changed/untracked files from git", false)
         .option("--confirm", "Confirm execution for policy-gated command", false)
-        .action((options: { cwd: string; format: "human" | "json"; confirm?: boolean }) => {
-          const targetDir = path.resolve(options.cwd);
-          const allowed = applyPolicy({
-            context,
-            projectRoot: targetDir,
-            command: "text check",
-            confirmed: options.confirm ?? false,
-            format: options.format
-          });
-          if (!allowed) {
-            return;
-          }
+        .action(
+          (options: {
+            cwd: string;
+            format: "human" | "json";
+            changedOnly?: boolean;
+            confirm?: boolean;
+          }) => {
+            const targetDir = path.resolve(options.cwd);
+            const allowed = applyPolicy({
+              context,
+              projectRoot: targetDir,
+              command: "text check",
+              confirmed: options.confirm ?? false,
+              format: options.format
+            });
+            if (!allowed) {
+              return;
+            }
 
-          const report = context.textPolicy.check(targetDir);
-          const envelope = createEnvelope({
-            ok: report.ok,
-            command: "text check",
-            data: {
-              checkedFiles: report.checkedFiles,
-              violationCount: report.violations.length,
-              violations: report.violations
-            },
-            warnings: report.warnings,
-            errors: report.errors
-          });
-          emitEnvelope(envelope, options.format);
-          context.auditLogger.append(targetDir, {
-            actor: "user",
-            command: "text check",
-            timestamp: new Date().toISOString(),
-            decision: "auto-run",
-            outcome: report.ok ? "success" : "failed",
-            message: report.ok ? undefined : "Text check failed"
-          });
+            const report = context.textPolicy.check(targetDir, {
+              changedOnly: options.changedOnly ?? false
+            });
+            const envelope = createEnvelope({
+              ok: report.ok,
+              command: "text check",
+              data: {
+                scanMode: report.scanMode,
+                checkedFiles: report.checkedFiles,
+                violationCount: report.violations.length,
+                violations: report.violations
+              },
+              warnings: report.warnings,
+              errors: report.errors
+            });
+            emitEnvelope(envelope, options.format);
+            context.auditLogger.append(targetDir, {
+              actor: "user",
+              command: "text check",
+              timestamp: new Date().toISOString(),
+              decision: "auto-run",
+              outcome: report.ok ? "success" : "failed",
+              message: report.ok ? undefined : "Text check failed"
+            });
 
-          if (!report.ok) {
-            process.exitCode = 3;
+            if (!report.ok) {
+              process.exitCode = 3;
+            }
           }
-        });
+        );
     }
   },
   {
@@ -575,6 +637,103 @@ export const builtInCommands: CommandDefinition[] = [
     description: "Questionnaire management",
     register: (program: Command, context) => {
       const questions = program.command("questions").description("Questionnaire management");
+      type QuestionsRunOptions = {
+        cwd: string;
+        format: "human" | "json";
+        lang?: string;
+        profile?: string;
+        answer?: string[];
+        nonInteractive?: boolean;
+        confirm?: boolean;
+      };
+
+      const executeQuestionsFlow = async (
+        commandName: "questions run" | "questions ask",
+        options: QuestionsRunOptions,
+        forceInteractivePrompt: boolean
+      ): Promise<void> => {
+        const targetDir = path.resolve(options.cwd);
+        const allowed = applyPolicy({
+          context,
+          projectRoot: targetDir,
+          command: commandName,
+          confirmed: options.confirm ?? false,
+          format: options.format
+        });
+        if (!allowed) {
+          return;
+        }
+
+        const answerPairs = options.answer ?? [];
+        const parsedAnswers = parseAnswerPairs(answerPairs);
+        if (answerPairs.length > 0 && parsedAnswers.length !== answerPairs.length) {
+          const envelope = createEnvelope({
+            ok: false,
+            command: commandName,
+            data: {
+              providedAnswers: answerPairs
+            },
+            warnings: [],
+            errors: [{ message: "Invalid --answer format. Use --answer id=value." }]
+          });
+          emitEnvelope(envelope, options.format);
+          process.exitCode = 2;
+          return;
+        }
+
+        let report = context.questions.run(targetDir, {
+          language: options.lang,
+          profile: options.profile,
+          nonInteractive: options.nonInteractive ?? false,
+          providedAnswers: parsedAnswers
+        });
+
+        const shouldPrompt =
+          options.format === "human" &&
+          (options.nonInteractive ?? false) === false &&
+          report.pendingQuestions.some((item) => item.required) &&
+          report.missingBlocks.length > 0 &&
+          (forceInteractivePrompt || parsedAnswers.length === 0);
+
+        if (shouldPrompt) {
+          const promptedAnswers = await collectInteractiveAnswers(report.pendingQuestions);
+          if (promptedAnswers.length > 0) {
+            report = context.questions.run(targetDir, {
+              language: report.language,
+              profile: options.profile,
+              nonInteractive: false,
+              providedAnswers: [...parsedAnswers, ...promptedAnswers]
+            });
+          }
+        }
+
+        const envelope = createEnvelope({
+          ok: report.ok,
+          command: commandName,
+          data: {
+            language: report.language,
+            completed: report.completed,
+            missingBlocks: report.missingBlocks,
+            pendingQuestions: report.pendingQuestions,
+            appliedAnswers: report.appliedAnswers,
+            updatedFiles: report.updatedFiles
+          },
+          warnings: report.warnings,
+          errors: report.errors
+        });
+        emitEnvelope(envelope, options.format);
+        context.auditLogger.append(targetDir, {
+          actor: "user",
+          command: commandName,
+          timestamp: new Date().toISOString(),
+          decision: "confirmed",
+          outcome: report.ok ? "success" : "failed",
+          message: report.ok ? undefined : `${commandName} failed`
+        });
+        if (!report.ok) {
+          process.exitCode = options.nonInteractive ? 5 : 7;
+        }
+      };
 
       questions
         .command("status")
@@ -628,55 +787,23 @@ export const builtInCommands: CommandDefinition[] = [
         .option("--cwd <path>", "Project root path", ".")
         .option("--format <format>", "Output format: human|json", "human")
         .option("--lang <code>", "Set questionnaire language for this run")
+        .option("--profile <name>", "Questions profile name", "default")
+        .option("--answer <id=value>", "Provide answer pair (repeatable)", appendOptionValue, [])
+        .option("--non-interactive", "Do not prompt for missing required answers", false)
         .option("--confirm", "Confirm execution for policy-gated command", false)
-        .action(
-          (options: {
-            cwd: string;
-            format: "human" | "json";
-            lang?: string;
-            confirm?: boolean;
-          }) => {
-            const targetDir = path.resolve(options.cwd);
-            const allowed = applyPolicy({
-              context,
-              projectRoot: targetDir,
-              command: "questions run",
-              confirmed: options.confirm ?? false,
-              format: options.format
-            });
-            if (!allowed) {
-              return;
-            }
+        .action((options: QuestionsRunOptions) => executeQuestionsFlow("questions run", options, false));
 
-            const report = context.questions.run(targetDir, {
-              language: options.lang
-            });
-            const envelope = createEnvelope({
-              ok: report.ok,
-              command: "questions run",
-              data: {
-                language: report.language,
-                completed: report.completed,
-                missingBlocks: report.missingBlocks,
-                updatedFiles: report.updatedFiles
-              },
-              warnings: report.warnings,
-              errors: report.errors
-            });
-            emitEnvelope(envelope, options.format);
-            context.auditLogger.append(targetDir, {
-              actor: "user",
-              command: "questions run",
-              timestamp: new Date().toISOString(),
-              decision: "confirmed",
-              outcome: report.ok ? "success" : "failed",
-              message: report.ok ? undefined : "Questions run failed"
-            });
-            if (!report.ok) {
-              process.exitCode = 7;
-            }
-          }
-        );
+      questions
+        .command("ask")
+        .description("Run interactive questionnaire interview")
+        .option("--cwd <path>", "Project root path", ".")
+        .option("--format <format>", "Output format: human|json", "human")
+        .option("--lang <code>", "Set questionnaire language for this run")
+        .option("--profile <name>", "Questions profile name", "default")
+        .option("--answer <id=value>", "Provide answer pair (repeatable)", appendOptionValue, [])
+        .option("--non-interactive", "Do not prompt for missing required answers", false)
+        .option("--confirm", "Confirm execution for policy-gated command", false)
+        .action((options: QuestionsRunOptions) => executeQuestionsFlow("questions ask", options, true));
     }
   },
   {
@@ -1160,6 +1287,127 @@ export const builtInCommands: CommandDefinition[] = [
             });
             if (!report.ok) {
               process.exitCode = 1;
+            }
+          }
+        );
+
+      tasks
+        .command("plan <taskId>")
+        .description("Generate execution plan for a task")
+        .option("--cwd <path>", "Project root path", ".")
+        .option("--format <format>", "Output format: human|json", "human")
+        .option("--confirm", "Confirm execution for policy-gated command", false)
+        .action(
+          (
+            taskId: string,
+            options: { cwd: string; format: "human" | "json"; confirm?: boolean }
+          ) => {
+            const targetDir = path.resolve(options.cwd);
+            const allowed = applyPolicy({
+              context,
+              projectRoot: targetDir,
+              command: "tasks plan",
+              confirmed: options.confirm ?? false,
+              format: options.format
+            });
+            if (!allowed) {
+              return;
+            }
+
+            const report = context.taskBoard.plan(targetDir, { taskId });
+            const envelope = createEnvelope({
+              ok: report.ok,
+              command: "tasks plan",
+              data: {
+                task: report.task,
+                generatedTasks: report.generatedTasks,
+                updatedFiles: report.updatedFiles
+              },
+              warnings: report.warnings,
+              errors: report.errors
+            });
+            emitEnvelope(envelope, options.format);
+            context.auditLogger.append(targetDir, {
+              actor: "user",
+              command: "tasks plan",
+              timestamp: new Date().toISOString(),
+              decision: "auto-run",
+              outcome: report.ok ? "success" : "failed",
+              message: report.ok ? undefined : "Tasks plan failed"
+            });
+            if (!report.ok) {
+              process.exitCode = 3;
+            }
+          }
+        );
+
+      tasks
+        .command("status <taskId> <status>")
+        .description("Move task to another status")
+        .option("--cwd <path>", "Project root path", ".")
+        .option("--format <format>", "Output format: human|json", "human")
+        .option("--confirm", "Confirm execution for policy-gated command", false)
+        .action(
+          (
+            taskId: string,
+            status: string,
+            options: { cwd: string; format: "human" | "json"; confirm?: boolean }
+          ) => {
+            const targetDir = path.resolve(options.cwd);
+            const allowed = applyPolicy({
+              context,
+              projectRoot: targetDir,
+              command: "tasks status",
+              confirmed: options.confirm ?? false,
+              format: options.format
+            });
+            if (!allowed) {
+              return;
+            }
+
+            const validStatuses = ["inbox", "ready", "in_progress", "review", "done"];
+            if (!validStatuses.includes(status)) {
+              const envelope = createEnvelope({
+                ok: false,
+                command: "tasks status",
+                data: {
+                  providedStatus: status
+                },
+                warnings: [],
+                errors: [{ message: `Invalid status "${status}"` }]
+              });
+              emitEnvelope(envelope, options.format);
+              process.exitCode = 2;
+              return;
+            }
+
+            const report = context.taskBoard.changeStatus(targetDir, {
+              taskId,
+              status: status as "inbox" | "ready" | "in_progress" | "review" | "done"
+            });
+            const envelope = createEnvelope({
+              ok: report.ok,
+              command: "tasks status",
+              data: {
+                task: report.task,
+                fromStatus: report.fromStatus,
+                toStatus: report.toStatus,
+                updatedFiles: report.updatedFiles
+              },
+              warnings: report.warnings,
+              errors: report.errors
+            });
+            emitEnvelope(envelope, options.format);
+            context.auditLogger.append(targetDir, {
+              actor: "user",
+              command: "tasks status",
+              timestamp: new Date().toISOString(),
+              decision: "confirmed",
+              outcome: report.ok ? "success" : "failed",
+              message: report.ok ? undefined : "Tasks status failed"
+            });
+            if (!report.ok) {
+              process.exitCode = 3;
             }
           }
         );

@@ -56,6 +56,20 @@ type ProviderHealth = {
   message: string;
 };
 
+type ReconciliationPolicy = {
+  conflictStrategy: "latest-timestamp" | "prefer-local" | "prefer-external";
+  timestampField: "updated_at" | "created_at";
+  onEqualTimestamp: "prefer-local" | "prefer-external";
+  dedupeById: boolean;
+};
+
+const DEFAULT_RECONCILIATION_POLICY: ReconciliationPolicy = {
+  conflictStrategy: "latest-timestamp",
+  timestampField: "updated_at",
+  onEqualTimestamp: "prefer-external",
+  dedupeById: true
+};
+
 const SyncTaskSchema = z.object({
   id: z.string().min(1),
   title: z.string().min(1),
@@ -220,19 +234,92 @@ const writeExternalTasks = (
   return toRelative(projectRoot, absolutePath);
 };
 
-const taskTimestamp = (task: SyncTask): number => {
-  const source = task.updated_at ?? task.created_at;
+const taskTimestamp = (task: SyncTask, field: ReconciliationPolicy["timestampField"]): number => {
+  const source = field === "updated_at" ? task.updated_at ?? task.created_at : task.created_at;
   const value = Date.parse(source);
   return Number.isNaN(value) ? 0 : value;
 };
 
+const parseReconciliationPolicy = (
+  mcpConfig: McpConfig,
+  warnings: McpIntegrationMutationReport["warnings"]
+): ReconciliationPolicy => {
+  const rawPolicy =
+    mcpConfig.provider_config &&
+    typeof mcpConfig.provider_config === "object" &&
+    !Array.isArray(mcpConfig.provider_config) &&
+    "reconciliation" in mcpConfig.provider_config &&
+    typeof mcpConfig.provider_config.reconciliation === "object" &&
+    mcpConfig.provider_config.reconciliation !== null
+      ? (mcpConfig.provider_config.reconciliation as Record<string, unknown>)
+      : {};
+
+  const nextPolicy: ReconciliationPolicy = {
+    ...DEFAULT_RECONCILIATION_POLICY
+  };
+
+  const conflictStrategy = rawPolicy.conflict_strategy;
+  if (
+    conflictStrategy === "latest-timestamp" ||
+    conflictStrategy === "prefer-local" ||
+    conflictStrategy === "prefer-external"
+  ) {
+    nextPolicy.conflictStrategy = conflictStrategy;
+  } else if (conflictStrategy !== undefined) {
+    warnings.push({
+      file: MCP_CONFIG_PATH,
+      path: "provider_config.reconciliation.conflict_strategy",
+      message: `Unsupported conflict strategy "${String(conflictStrategy)}"; fallback to ${DEFAULT_RECONCILIATION_POLICY.conflictStrategy}`
+    });
+  }
+
+  const timestampField = rawPolicy.timestamp_field;
+  if (timestampField === "updated_at" || timestampField === "created_at") {
+    nextPolicy.timestampField = timestampField;
+  } else if (timestampField !== undefined) {
+    warnings.push({
+      file: MCP_CONFIG_PATH,
+      path: "provider_config.reconciliation.timestamp_field",
+      message: `Unsupported timestamp field "${String(timestampField)}"; fallback to ${DEFAULT_RECONCILIATION_POLICY.timestampField}`
+    });
+  }
+
+  const onEqualTimestamp = rawPolicy.on_equal_timestamp;
+  if (onEqualTimestamp === "prefer-local" || onEqualTimestamp === "prefer-external") {
+    nextPolicy.onEqualTimestamp = onEqualTimestamp;
+  } else if (onEqualTimestamp !== undefined) {
+    warnings.push({
+      file: MCP_CONFIG_PATH,
+      path: "provider_config.reconciliation.on_equal_timestamp",
+      message: `Unsupported on_equal_timestamp "${String(onEqualTimestamp)}"; fallback to ${DEFAULT_RECONCILIATION_POLICY.onEqualTimestamp}`
+    });
+  }
+
+  if (typeof rawPolicy.dedupe_by_id === "boolean") {
+    nextPolicy.dedupeById = rawPolicy.dedupe_by_id;
+  } else if (rawPolicy.dedupe_by_id !== undefined) {
+    warnings.push({
+      file: MCP_CONFIG_PATH,
+      path: "provider_config.reconciliation.dedupe_by_id",
+      message: `Unsupported dedupe_by_id value "${String(rawPolicy.dedupe_by_id)}"; fallback to ${String(DEFAULT_RECONCILIATION_POLICY.dedupeById)}`
+    });
+  }
+
+  return nextPolicy;
+};
+
 const mergeTasksBidirectional = (
   localTasks: SyncTask[],
-  externalTasks: SyncTask[]
+  externalTasks: SyncTask[],
+  policy: ReconciliationPolicy
 ): { merged: SyncTask[]; conflicts: string[] } => {
   const conflicts: string[] = [];
-  const localMap = new Map(localTasks.map((task) => [task.id, task]));
-  const externalMap = new Map(externalTasks.map((task) => [task.id, task]));
+  const localMap = new Map(
+    localTasks.map((task) => [`${policy.dedupeById ? task.id : `${task.id}:${task.created_at}`}`, task])
+  );
+  const externalMap = new Map(
+    externalTasks.map((task) => [`${policy.dedupeById ? task.id : `${task.id}:${task.created_at}`}`, task])
+  );
   const ids = new Set([...localMap.keys(), ...externalMap.keys()]);
   const merged: SyncTask[] = [];
 
@@ -258,13 +345,28 @@ const mergeTasksBidirectional = (
       continue;
     }
 
-    const resolved = taskTimestamp(local) >= taskTimestamp(external) ? local : external;
+    let resolved: SyncTask;
+    if (policy.conflictStrategy === "prefer-local") {
+      resolved = local;
+    } else if (policy.conflictStrategy === "prefer-external") {
+      resolved = external;
+    } else {
+      const localTime = taskTimestamp(local, policy.timestampField);
+      const externalTime = taskTimestamp(external, policy.timestampField);
+      if (localTime === externalTime) {
+        resolved = policy.onEqualTimestamp === "prefer-local" ? local : external;
+      } else {
+        resolved = localTime > externalTime ? local : external;
+      }
+    }
+
     conflicts.push(
-      `Conflict resolved for task "${id}" using latest timestamp (${resolved === local ? "local" : "external"})`
+      `Conflict resolved for task "${id}" using ${policy.conflictStrategy} (${resolved === local ? "local" : "external"})`
     );
     merged.push(resolved);
   }
 
+  merged.sort((left, right) => left.id.localeCompare(right.id));
   return { merged, conflicts };
 };
 
@@ -388,7 +490,13 @@ export class TaskMcpIntegrationService implements TaskMcpIntegrationPort {
         sync_direction: nextDirection,
         provider_config: {
           strategy: "delegate",
-          adapter_hint: "user-managed-mcp"
+          adapter_hint: "user-managed-mcp",
+          reconciliation: {
+            conflict_strategy: "latest-timestamp",
+            timestamp_field: "updated_at",
+            on_equal_timestamp: "prefer-external",
+            dedupe_by_id: true
+          }
         },
         notes: "Connected custom provider (external user-managed MCP)"
       };
@@ -517,6 +625,7 @@ export class TaskMcpIntegrationService implements TaskMcpIntegrationPort {
       const warnings: McpIntegrationMutationReport["warnings"] = [];
       const errors: McpIntegrationMutationReport["errors"] = [];
       const updatedFiles: string[] = [];
+      const reconciliationPolicy = parseReconciliationPolicy(mcpConfig, warnings);
 
       if (mcpConfig.sync_direction === "pull") {
         const grouped = groupByStatus(externalTasks);
@@ -524,7 +633,11 @@ export class TaskMcpIntegrationService implements TaskMcpIntegrationPort {
       } else if (mcpConfig.sync_direction === "push") {
         updatedFiles.push(writeExternalTasks(projectRoot, mcpConfig, localTasks));
       } else if (mcpConfig.sync_direction === "bidirectional") {
-        const { merged, conflicts } = mergeTasksBidirectional(localTasks, externalTasks);
+        const { merged, conflicts } = mergeTasksBidirectional(
+          localTasks,
+          externalTasks,
+          reconciliationPolicy
+        );
         const grouped = groupByStatus(merged);
         updatedFiles.push(...writeLocalBoardByStatus(projectRoot, grouped));
         updatedFiles.push(writeExternalTasks(projectRoot, mcpConfig, merged));

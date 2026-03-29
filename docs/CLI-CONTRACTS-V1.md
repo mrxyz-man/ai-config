@@ -4,9 +4,9 @@
 
 This document defines implementation contracts for v1 commands:
 - Core: `init`, `sync`, `resolve`, `validate`, `explain`
-- Tasks: `tasks enable|disable|intake|list|sync`
+- Tasks: `tasks enable|disable|intake|plan|status|list|sync`
 - Text: `text check`
-- Questions: `questions status|run`
+- Questions: `questions status|run|ask`
 - MCP prep: `mcp status|connect|disconnect`
 
 Design goals:
@@ -23,13 +23,14 @@ Design goals:
 
 `ai-config <command> [subcommand] [options]`
 
-### 2.2 Global flags
+### 2.2 Common flags
 
 - `--cwd <path>`: target project directory (default: current directory)
 - `--format <human|json>`: output format (default: `human`)
-- `--quiet`: suppress non-essential logs
-- `--no-color`: disable colored output
-- `--non-interactive`: fail if interactive input is required
+
+Notes:
+- `--non-interactive` is supported only on `questions run` and `questions ask`.
+- `--changed-only` is supported only on `text check`.
 
 ### 2.3 Standard output contract
 
@@ -277,6 +278,7 @@ Execution mode mapping:
   - `explain`
   - `mcp status`
   - `tasks intake`
+  - `tasks plan`
   - `tasks list`
   - `text check`
   - `questions status`
@@ -288,10 +290,12 @@ Execution mode mapping:
   - `tasks sync`
   - `tasks enable`
   - `tasks disable`
+  - `tasks status`
   - `questions run`
+  - `questions ask`
 
 Any policy decision should be reflected in:
-- command output (`data.policy_decision`)
+- command output (`data.policyDecision`)
 - `./ai/state/audit-log.yaml`
 
 ---
@@ -310,37 +314,71 @@ Any policy decision should be reflected in:
 - Side effects: updates `ai/tasks/board/inbox.yaml`, appends audit event.
 - Policy: auto-run.
 
-### 10.3 `ai-config tasks list [--status]`
+### 10.3 `ai-config tasks plan <task-id>`
+
+- Purpose: enrich task planning fields (`acceptance_criteria`, `risks`) and decompose epic tasks into derived micro-tasks when enabled.
+- Side effects: updates task board files, appends audit event.
+- Policy: auto-run.
+
+### 10.4 `ai-config tasks status <task-id> <status>`
+
+- Purpose: move task between statuses with transition rules.
+- Side effects: updates task board files, appends audit event.
+- Policy: confirm-required.
+
+### 10.5 `ai-config tasks list [--status]`
 
 - Purpose: list tasks from local board, optionally filtered by status.
 - Side effects: none (besides audit).
 - Policy: auto-run.
 
-### 10.4 `ai-config tasks sync`
+### 10.6 `ai-config tasks sync`
 
 - Purpose: run MCP-backed task sync using configured provider.
-- Side effects: provider-dependent (currently skeleton/no-op sync), audit append.
+- Behavior:
+  - `pull`: imports external tasks to local board.
+  - `push`: exports local tasks to external board.
+  - `bidirectional`: merges local/external tasks using reconciliation policy from `ai/tasks/integrations/mcp.yaml`.
+- Reconciliation policy fields (`provider_config.reconciliation`):
+  - `conflict_strategy`: `latest-timestamp|prefer-local|prefer-external`
+  - `timestamp_field`: `updated_at|created_at`
+  - `on_equal_timestamp`: `prefer-local|prefer-external`
+  - `dedupe_by_id`: boolean
+- Side effects: updates local board files and/or external board file according to `sync_direction`, then appends audit event.
 - Policy: confirm-required.
 
-### 10.5 `ai-config text check`
+### 10.7 `ai-config text check`
 
-- Purpose: run mojibake/encoding/cyrillic readability checks against `./ai` text sources.
+- Purpose: run mojibake/encoding/cyrillic readability checks across repository text files.
+- Scope rules: respects `ai/rules/ignore.yaml` (`ignore` + `allowlist_overrides`) during scan.
+- Option: `--changed-only` limits scan to changed/untracked git files; if git metadata is unavailable, command falls back to repository scan with warning.
+- Performance guardrails:
+  - max file size per scanned file: `512 KB`
+  - max scanned files per run: `4000`
+  - max total scanned text size per run: `32 MB`
+  - when limits are reached, scan stops early and emits warnings
 - Side effects: none (besides audit).
 - Policy: auto-run.
 
-### 10.6 `ai-config questions status`
+### 10.8 `ai-config questions status`
 
 - Purpose: show questionnaire completion and missing required blocks.
 - Side effects: none (besides audit).
 - Policy: auto-run.
 
-### 10.7 `ai-config questions run [--lang]`
+### 10.9 `ai-config questions run [--lang]`
 
 - Purpose: run questionnaire lifecycle update and persist language/completion state.
 - Side effects: updates `ai/questions/answers.yaml`, appends audit event.
 - Policy: confirm-required.
 
-### 10.8 `ai-config mcp status|connect|disconnect`
+### 10.10 `ai-config questions ask [--lang]`
+
+- Purpose: run interview-first questionnaire flow (interactive by default in human mode), with optional non-interactive prefilled answers.
+- Side effects: updates `ai/questions/answers.yaml`, appends audit event.
+- Policy: confirm-required.
+
+### 10.11 `ai-config mcp status|connect|disconnect`
 
 - `status`: read integration status and provider health hints (auto-run).
 - `connect`: enable provider + set mode/sync direction (confirm-required).

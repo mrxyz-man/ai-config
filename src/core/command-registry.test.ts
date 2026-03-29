@@ -139,11 +139,29 @@ describe("CommandRegistry", () => {
           tasks: [],
           warnings: [],
           errors: []
+        }),
+        plan: () => ({
+          ok: true,
+          task: null,
+          generatedTasks: [],
+          updatedFiles: [],
+          warnings: [],
+          errors: []
+        }),
+        changeStatus: () => ({
+          ok: true,
+          task: null,
+          fromStatus: "inbox",
+          toStatus: "ready",
+          updatedFiles: [],
+          warnings: [],
+          errors: []
         })
       },
       textPolicy: {
         check: () => ({
           ok: true,
+          scanMode: "repository",
           checkedFiles: 0,
           violations: [],
           warnings: [],
@@ -167,6 +185,8 @@ describe("CommandRegistry", () => {
           language: "ru",
           completed: true,
           missingBlocks: [],
+          pendingQuestions: [],
+          appliedAnswers: 0,
           updatedFiles: [],
           warnings: [],
           errors: []

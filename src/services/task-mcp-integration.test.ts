@@ -91,10 +91,26 @@ describe("TaskMcpIntegrationService", () => {
     expect(report.provider).toBe("custom");
     const mcpYaml = YAML.parse(
       fs.readFileSync(path.join(projectRoot, "ai/tasks/integrations/mcp.yaml"), "utf8")
-    ) as { provider: string | null; enabled: boolean; provider_config?: { strategy?: string } };
+    ) as {
+      provider: string | null;
+      enabled: boolean;
+      provider_config?: {
+        strategy?: string;
+        reconciliation?: {
+          conflict_strategy?: string;
+          timestamp_field?: string;
+          on_equal_timestamp?: string;
+          dedupe_by_id?: boolean;
+        };
+      };
+    };
     expect(mcpYaml.enabled).toBe(true);
     expect(mcpYaml.provider).toBe("custom");
     expect(mcpYaml.provider_config?.strategy).toBe("delegate");
+    expect(mcpYaml.provider_config?.reconciliation?.conflict_strategy).toBe("latest-timestamp");
+    expect(mcpYaml.provider_config?.reconciliation?.timestamp_field).toBe("updated_at");
+    expect(mcpYaml.provider_config?.reconciliation?.on_equal_timestamp).toBe("prefer-external");
+    expect(mcpYaml.provider_config?.reconciliation?.dedupe_by_id).toBe(true);
   });
 
   it("returns no-op sync warning when provider is not connected", () => {
@@ -253,5 +269,79 @@ describe("TaskMcpIntegrationService", () => {
     expect(report.ok).toBe(true);
     expect(report.warnings.some((warning) => warning.message.includes("Conflict resolved"))).toBe(true);
     expect(inbox.tasks.find((task) => task.id === "T300")?.description).toBe("External version");
+  });
+
+  it("sync bidirectional respects prefer-local reconciliation policy", () => {
+    const projectRoot = createTempProject();
+    const service = new TaskMcpIntegrationService();
+    service.connect(projectRoot, { provider: "custom", mode: "hybrid" });
+    const mcpConfig = YAML.parse(fs.readFileSync(mcpConfigPath(projectRoot), "utf8")) as Record<
+      string,
+      unknown
+    >;
+    mcpConfig.sync_direction = "bidirectional";
+    mcpConfig.provider_config = {
+      strategy: "delegate",
+      reconciliation: {
+        conflict_strategy: "prefer-local",
+        timestamp_field: "updated_at",
+        on_equal_timestamp: "prefer-external",
+        dedupe_by_id: true
+      }
+    };
+    fs.writeFileSync(mcpConfigPath(projectRoot), YAML.stringify(mcpConfig), "utf8");
+
+    fs.writeFileSync(
+      inboxPath(projectRoot),
+      YAML.stringify({
+        tasks: [
+          {
+            id: "T310",
+            title: "Local preferred",
+            type: "task",
+            priority: "P2",
+            status: "inbox",
+            description: "Local winner",
+            acceptance_criteria: [],
+            risks: [],
+            dependencies: [],
+            created_at: "2026-03-29T00:00:00.000Z",
+            updated_at: "2026-03-29T00:00:01.000Z"
+          }
+        ]
+      }),
+      "utf8"
+    );
+
+    fs.writeFileSync(
+      externalBoardPath(projectRoot),
+      YAML.stringify({
+        tasks: [
+          {
+            id: "T310",
+            title: "External candidate",
+            type: "task",
+            priority: "P2",
+            status: "inbox",
+            description: "External loser",
+            acceptance_criteria: [],
+            risks: [],
+            dependencies: [],
+            created_at: "2026-03-29T00:00:00.000Z",
+            updated_at: "2026-03-29T00:00:10.000Z"
+          }
+        ]
+      }),
+      "utf8"
+    );
+
+    const report = service.sync(projectRoot);
+    const inbox = YAML.parse(fs.readFileSync(inboxPath(projectRoot), "utf8")) as {
+      tasks: Array<{ id: string; description: string }>;
+    };
+
+    expect(report.ok).toBe(true);
+    expect(report.warnings.some((warning) => warning.message.includes("prefer-local"))).toBe(true);
+    expect(inbox.tasks.find((task) => task.id === "T310")?.description).toBe("Local winner");
   });
 });

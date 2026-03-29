@@ -234,6 +234,25 @@ export type TasksListReport = {
   errors: TasksIssue[];
 };
 
+export type TasksPlanReport = {
+  ok: boolean;
+  task: TaskRecord | null;
+  generatedTasks: TaskRecord[];
+  updatedFiles: string[];
+  warnings: TasksIssue[];
+  errors: TasksIssue[];
+};
+
+export type TasksStatusReport = {
+  ok: boolean;
+  task: TaskRecord | null;
+  fromStatus: TaskStatus | null;
+  toStatus: TaskStatus | null;
+  updatedFiles: string[];
+  warnings: TasksIssue[];
+  errors: TasksIssue[];
+};
+
 export interface TaskBoardPort {
   enable(projectRoot: string): TasksToggleReport;
   disable(projectRoot: string): TasksToggleReport;
@@ -242,6 +261,11 @@ export interface TaskBoardPort {
     input: { text: string; type?: TaskType; priority?: TaskPriority; source?: string }
   ): TasksIntakeReport;
   list(projectRoot: string, options?: { status?: TaskStatus }): TasksListReport;
+  plan(projectRoot: string, input: { taskId: string }): TasksPlanReport;
+  changeStatus(
+    projectRoot: string,
+    input: { taskId: string; status: TaskStatus }
+  ): TasksStatusReport;
 }
 
 export type TextIssue = {
@@ -252,6 +276,7 @@ export type TextIssue = {
 
 export type TextCheckReport = {
   ok: boolean;
+  scanMode: "repository" | "changed-only";
   checkedFiles: number;
   violations: Array<{
     file: string;
@@ -263,7 +288,7 @@ export type TextCheckReport = {
 };
 
 export interface TextPolicyPort {
-  check(projectRoot: string): TextCheckReport;
+  check(projectRoot: string, options?: { changedOnly?: boolean }): TextCheckReport;
 }
 
 export type QuestionsIssue = {
@@ -289,6 +314,13 @@ export type QuestionsRunReport = {
   language: string;
   completed: boolean;
   missingBlocks: string[];
+  pendingQuestions: Array<{
+    id: string;
+    blockId: string;
+    prompt: string;
+    required: boolean;
+  }>;
+  appliedAnswers: number;
   updatedFiles: string[];
   warnings: QuestionsIssue[];
   errors: QuestionsIssue[];
@@ -296,5 +328,13 @@ export type QuestionsRunReport = {
 
 export interface QuestionsPort {
   status(projectRoot: string): QuestionsStatusReport;
-  run(projectRoot: string, options?: { language?: string }): QuestionsRunReport;
+  run(
+    projectRoot: string,
+    options?: {
+      language?: string;
+      profile?: string;
+      nonInteractive?: boolean;
+      providedAnswers?: Array<{ id: string; value: string; confidence?: string }>;
+    }
+  ): QuestionsRunReport;
 }
