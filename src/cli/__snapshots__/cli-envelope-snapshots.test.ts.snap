@@ -1,0 +1,57 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`CLI JSON envelope snapshots mcp status envelope shape is stable 1`] = `
+{
+  "command": "mcp status",
+  "data": {
+    "enabled": false,
+    "mode": "local",
+    "provider": null,
+    "syncDirection": "none",
+  },
+  "errors": [],
+  "ok": true,
+  "timestamp": "<timestamp>",
+  "warnings": [],
+}
+`;
+
+exports[`CLI JSON envelope snapshots questions status envelope shape is stable 1`] = `
+{
+  "command": "questions status",
+  "data": {
+    "completed": false,
+    "enabled": true,
+    "language": "ru",
+    "missingBlocks": [
+      "coding-standards",
+    ],
+  },
+  "errors": [],
+  "ok": true,
+  "timestamp": "<timestamp>",
+  "warnings": [],
+}
+`;
+
+exports[`CLI JSON envelope snapshots validate envelope shape is stable 1`] = `
+{
+  "command": "validate",
+  "data": {
+    "errorCount": 0,
+    "scope": "schemas",
+    "validatedFiles": [
+      "ai/ai.yaml",
+      "ai/modules.yaml",
+      "ai/project.yaml",
+      "ai/resolved.yaml",
+      "ai/rules/ignore.yaml",
+    ],
+    "warningCount": 0,
+  },
+  "errors": [],
+  "ok": true,
+  "timestamp": "<timestamp>",
+  "warnings": [],
+}
+`;

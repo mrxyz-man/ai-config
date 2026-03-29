@@ -186,7 +186,7 @@ Solves:
 Requirements:
 - Must be optionally enabled/disabled (`task-first` mode toggle).
 - Must always offer task creation when enabled.
-- Must support external task backends via MCP (e.g., GitLab).
+- Must support external task backends via MCP (user-managed custom provider).
 - Must support local mode, hybrid mode, and remote-first mode.
 - Must preserve task traceability between user request and execution.
 
@@ -288,7 +288,11 @@ Future module onboarding requirement:
 
 ---
 
-## 7. Command Surface (High-Level)
+## 7. Command Surface (Long-Term Target)
+
+Note:
+- This section describes the long-term target command surface.
+- The authoritative v1 frozen command surface is defined in section `12.3 Mandatory v1 Commands`.
 
 ### 7.1 Core Commands
 
@@ -445,13 +449,14 @@ Core:
 - `ai-config validate`
 - `ai-config explain`
 
-Ignore:
-- `ai-config ignore add <pattern>`
-- `ai-config ignore remove <pattern>`
-- `ai-config ignore list`
+MCP:
+- `ai-config mcp status`
+- `ai-config mcp connect <provider>`
+- `ai-config mcp disconnect`
 
 Questions/Text:
 - `ai-config questions run`
+- `ai-config questions ask`
 - `ai-config questions status`
 - `ai-config text check`
 
@@ -459,16 +464,22 @@ Tasks (v1 basic, local only):
 - `ai-config tasks enable`
 - `ai-config tasks disable`
 - `ai-config tasks intake "<text>"`
+- `ai-config tasks plan <task-id>`
+- `ai-config tasks status <task-id> <status>`
 - `ai-config tasks list`
+- `ai-config tasks sync`
 
 ### 12.4 v1 Non-Mandatory (Phase 2+)
 
 Move to later phases:
-- MCP bi-directional task sync.
+- `ignore` command group (`add/remove/list/check`).
+- `text fix` and `text doctor`.
+- `questions reset --profile <name>`.
+- `agents` command group.
+- `update`, `doctor`, `diff` command families.
 - Advanced multi-agent workflow execution.
-- Auto text fix with aggressive transforms.
 - Complex policy packs and organization governance templates.
-- Full migration framework for major schema rewrites.
+- Major-version migration framework beyond baseline v1 step migrations.
 
 ### 12.5 v1 Acceptance Criteria
 
@@ -528,18 +539,14 @@ Quick reference:
 | `ai-config validate` | Auto-run | Non-destructive consistency checks | Low |
 | `ai-config explain` | Auto-run | Read-only provenance analysis | Low |
 | `ai-config tasks intake "<text>"` | Auto-run | Structured task creation from prompt | Low |
+| `ai-config tasks plan <task-id>` | Auto-run | Planning enrichment and epic decomposition | Low |
 | `ai-config tasks list` | Auto-run | Read-only task board view | Low |
 | `ai-config text check` | Auto-run | Non-mutating text quality diagnostics | Low |
 | `ai-config questions status` | Auto-run | Read-only questionnaire progress | Low |
-| `ai-config ignore list` | Auto-run | Read-only ignore rules listing | Low |
-| `ai-config ignore check <path>` | Auto-run | Read-only path evaluation | Low |
 | `ai-config init` | Confirm | Creates and populates project config tree | High |
 | `ai-config sync` | Confirm | Updates managed config layers and migrations | High |
-| `ai-config update` | Confirm | Version changes may alter behavior | High |
 | `ai-config questions run` | Confirm | May alter onboarding answers/config quality | Medium |
-| `ai-config text fix` | Confirm | Mutates text-related config/content | Medium |
-| `ai-config ignore add <pattern>` | Confirm | Changes scan surface for agent context | Medium |
-| `ai-config ignore remove <pattern>` | Confirm | Can expose unintended files to agent | Medium |
+| `ai-config questions ask` | Confirm | Interactive questionnaire update with persisted answers | Medium |
 | `ai-config tasks enable` | Confirm | Changes execution model to task-first | Medium |
 | `ai-config tasks disable` | Confirm | Disables structured task governance | Medium |
 | `ai-config tasks status <task-id> <status>` | Confirm | Mutates task lifecycle state | Medium |
@@ -553,20 +560,17 @@ Auto-run allowed:
 - `ai-config validate`
 - `ai-config explain`
 - `ai-config tasks intake "<text>"`
+- `ai-config tasks plan <task-id>`
 - `ai-config tasks list`
 - `ai-config text check`
 - `ai-config questions status`
-- `ai-config ignore list`
-- `ai-config ignore check <path>`
+- `ai-config mcp status`
 
 Require user confirmation:
 - `ai-config init`
 - `ai-config sync`
-- `ai-config update`
 - `ai-config questions run`
-- `ai-config text fix`
-- `ai-config ignore add <pattern>`
-- `ai-config ignore remove <pattern>`
+- `ai-config questions ask`
 - `ai-config tasks enable`
 - `ai-config tasks disable`
 - `ai-config tasks status <task-id> <status>`
