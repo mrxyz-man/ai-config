@@ -1,6 +1,6 @@
 {
   "name": "@mrxyz/ai-config",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Configuration and synchronization system for AI agents",
   "private": false,
   "type": "commonjs",
