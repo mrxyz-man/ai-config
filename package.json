@@ -1,5 +1,5 @@
 {
-  "name": "ai-config",
+  "name": "@mrxyz/ai-config",
   "version": "0.1.1",
   "description": "Configuration and synchronization system for AI agents",
   "private": false,
@@ -12,6 +12,9 @@
   ],
   "bin": {
     "ai-config": "dist/cli.js"
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "engines": {
     "node": ">=24.14.0 <25",
