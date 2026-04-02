@@ -3,9 +3,9 @@
 ## E2E Feedback (2026-04-02)
 
 ### Context
-- Local build tested via `node E:\Projects\ai-config\dist\cli.js` (not published package).
-- Real project target: `E:\Projects\konoha\my-store`.
-- Full scenario matrix executed in `E:\Projects\konoha\my-store\_ai-config-e2e`.
+- Local build tested via `node <repo-root>/dist/cli.js` (not published package).
+- Real project target: `<target-project-root>`.
+- Full scenario matrix executed in `<target-project-root>/_ai-config-e2e`.
 
 ### Verified
 - `init/validate/sync` flows are stable for `fresh`, `managed`, `foreign`, and `mixed`.
