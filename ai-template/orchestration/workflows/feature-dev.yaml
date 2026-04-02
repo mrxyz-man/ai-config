@@ -1,0 +1,104 @@
+schema_version: "1"
+id: "feature-dev"
+title: "Feature Development Workflow"
+enabled: true
+applies_to_task_types:
+  - "feature"
+
+entry_conditions:
+  - "task_status_is_pending_or_in_progress"
+  - "task_context_exists"
+
+steps:
+  - id: "context_hydration"
+    role: "developer"
+    skills:
+      - "context-hydration"
+    inputs:
+      - ".ai/manifest.yaml"
+      - ".ai/config.yaml"
+      - ".ai/modules.yaml"
+      - ".ai/project/*"
+      - ".ai/rules/*"
+      - ".ai/qa.yaml"
+    outputs:
+      - "context_summary"
+      - "open_context_gaps"
+    on_success: "plan_task"
+    on_failure: "escalate_or_block"
+
+  - id: "plan_task"
+    role: "developer"
+    skills:
+      - "task-breakdown"
+    inputs:
+      - "task_context"
+      - "context_summary"
+    outputs:
+      - "task_plan"
+      - "risk_register"
+      - "acceptance_criteria"
+    on_success: "implement"
+    on_failure: "escalate_or_block"
+
+  - id: "implement"
+    role: "developer"
+    skills:
+      - "code-generation"
+    inputs:
+      - "task_plan"
+      - ".ai/rules/*"
+    outputs:
+      - "change_summary"
+      - "changed_files"
+      - "verification_results"
+    on_success: "validate_quality"
+    on_failure: "retry_or_escalate"
+
+  - id: "validate_quality"
+    role: "developer"
+    skills:
+      - "testing"
+    inputs:
+      - "changed_files"
+      - "acceptance_criteria"
+    outputs:
+      - "test_report"
+      - "test_gaps"
+    on_success: "review"
+    on_failure: "implement"
+
+  - id: "review"
+    role: "reviewer"
+    skills:
+      - "documentation"
+    inputs:
+      - "changed_files"
+      - "verification_results"
+      - "test_report"
+    outputs:
+      - "review_findings"
+      - "review_decision"
+    on_success: "complete_task"
+    on_failure: "implement"
+
+  - id: "complete_task"
+    role: "developer"
+    skills:
+      - "documentation"
+    inputs:
+      - "review_decision"
+      - "change_summary"
+    outputs:
+      - "final_summary"
+      - "updated_docs"
+    on_success: "completed"
+    on_failure: "escalate_or_block"
+
+max_iterations: 3
+
+done_criteria:
+  - "review_passed"
+  - "required_quality_gates_passed"
+  - "final_summary_recorded"
+

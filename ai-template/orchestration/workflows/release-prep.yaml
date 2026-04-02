@@ -1,0 +1,104 @@
+schema_version: "1"
+id: "release-prep"
+title: "Release Preparation Workflow"
+enabled: true
+applies_to_task_types:
+  - "release"
+  - "stabilization"
+
+entry_conditions:
+  - "release_scope_defined_or_definable"
+  - "target_environments_known"
+
+steps:
+  - id: "scope_lock"
+    role: "architect"
+    fallback_role: "developer"
+    skills:
+      - "task-breakdown"
+      - "documentation"
+    inputs:
+      - "planned_changes"
+      - "open_tasks"
+    outputs:
+      - "release_scope"
+      - "excluded_items"
+      - "known_risks"
+    on_success: "quality_gate_verification"
+    on_failure: "escalate_or_block"
+
+  - id: "quality_gate_verification"
+    role: "reviewer"
+    skills:
+      - "testing"
+    inputs:
+      - "build_status"
+      - "lint_status"
+      - "typecheck_status"
+      - "test_status"
+    outputs:
+      - "gate_report"
+      - "blocking_findings"
+    on_success: "release_notes_preparation"
+    on_failure: "fix_cycle"
+
+  - id: "fix_cycle"
+    role: "developer"
+    skills:
+      - "code-generation"
+      - "testing"
+    inputs:
+      - "blocking_findings"
+    outputs:
+      - "fix_summary"
+      - "retest_results"
+    on_success: "quality_gate_verification"
+    on_failure: "escalate_or_block"
+
+  - id: "release_notes_preparation"
+    role: "developer"
+    skills:
+      - "documentation"
+    inputs:
+      - "merged_changes"
+      - "known_risks"
+    outputs:
+      - "release_notes"
+      - "migration_notes"
+      - "rollback_notes"
+    on_success: "deployment_readiness_check"
+    on_failure: "escalate_or_block"
+
+  - id: "deployment_readiness_check"
+    role: "architect"
+    fallback_role: "reviewer"
+    skills:
+      - "documentation"
+    inputs:
+      - "environment_config"
+      - "migration_notes"
+      - "rollback_notes"
+    outputs:
+      - "readiness_decision"
+    on_success: "complete_release_prep"
+    on_failure: "fix_cycle_or_block"
+
+  - id: "complete_release_prep"
+    role: "reviewer"
+    skills:
+      - "documentation"
+    inputs:
+      - "readiness_decision"
+      - "release_notes"
+    outputs:
+      - "final_release_packet"
+    on_success: "completed"
+    on_failure: "escalate_or_block"
+
+max_iterations: 3
+
+done_criteria:
+  - "scope_locked"
+  - "quality_gates_passed"
+  - "release_docs_ready"
+  - "rollback_plan_defined"

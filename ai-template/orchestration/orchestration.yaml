@@ -1,0 +1,76 @@
+schema_version: "1"
+enabled: true
+mode: "assisted" # manual | assisted | enforced
+
+defaults:
+  default_workflow: "feature-dev"
+  task_id_format: "TASK-YYYYMMDD-###"
+  initial_status: "pending"
+  max_active_tasks: 1
+
+lifecycle:
+  statuses:
+    - "pending"
+    - "in_progress"
+    - "blocked"
+    - "review"
+    - "completed"
+    - "cancelled"
+  allowed_transitions:
+    - from: "pending"
+      to: ["in_progress", "cancelled"]
+    - from: "in_progress"
+      to: ["review", "blocked", "cancelled"]
+    - from: "review"
+      to: ["in_progress", "completed", "blocked"]
+    - from: "blocked"
+      to: ["in_progress", "cancelled"]
+
+execution_policy:
+  single_workflow_per_task: true
+  max_iterations_per_workflow: 3
+  stop_on_blocking_failure: true
+  require_step_output: true
+  require_handoff_payload: true
+
+quality_gates:
+  required_for_completed:
+    - "review_completed"
+    - "lint_passed_if_applicable"
+    - "typecheck_passed_if_applicable"
+    - "tests_passed_if_applicable"
+  allow_override_with_user_confirmation: true
+
+escalation_policy:
+  escalate_on:
+    - "repeated_failures"
+    - "unresolved_blocker"
+    - "conflicting_requirements"
+  targets_priority:
+    - "architect"
+    - "user"
+  max_retry_before_escalation: 1
+
+role_and_skill_resolution:
+  role_source: ".ai/agents/registry.yaml"
+  skill_source: ".ai/skills/registry.yaml"
+  on_missing_role: "fallback_to_default_role"
+  on_missing_skill: "skip_with_warning"
+
+task_storage:
+  mode: "local_files" # local_files | external_mcp
+  paths:
+    pending: "tasks/pending"
+    in_progress: "tasks/in_progress"
+    completed: "tasks/completed"
+
+observability:
+  log_level: "normal" # minimal | normal | verbose
+  record_step_history: true
+  record_decisions: true
+  record_failures_with_reason: true
+
+safety:
+  allow_destructive_actions: false
+  write_requires_confirmation: true
+  require_explicit_user_approval_for_cancel: true

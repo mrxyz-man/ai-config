@@ -1,0 +1,28 @@
+schema:
+  version: "1"
+
+profile:
+  name: "default"
+  mode: "bootstrap"
+
+context:
+  source_of_truth: ".ai/"
+  respect_aiignore: true
+  max_context_files: 200
+
+behavior:
+  ask_before_task_creation: true
+  task_mode: "off"
+  questionnaire_on_init: false
+
+modules:
+  registry_file: "modules.yaml"
+  strict_enabled_only: true
+
+output:
+  default_format: "human"
+  include_warnings: true
+
+safety:
+  allow_destructive_actions: false
+  require_explicit_confirmation: true

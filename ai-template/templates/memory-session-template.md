@@ -1,0 +1,17 @@
+### Session: SES-YYYYMMDD-001
+- Date: 2026-04-01
+- Goal:
+  - What this session aims to achieve.
+- Actions taken:
+  - Action 1
+  - Action 2
+- Artifacts changed:
+  - /path/to/file
+- Current status:
+  - in_progress | blocked | done
+- Next steps:
+  - Step 1
+  - Step 2
+- Open risks:
+  - Risk 1
+- Confidence: low | medium | high

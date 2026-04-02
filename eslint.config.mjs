@@ -35,6 +35,13 @@ export default [
       "@stylistic/indent": ["error", 2],
       "@stylistic/quote-props": ["error", "as-needed"]
     }
+  },
+  {
+    files: ["src/**/*.test.ts"],
+    languageOptions: {
+      globals: {
+        ...globals.jest
+      }
+    }
   }
 ];
-

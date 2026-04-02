@@ -1,0 +1,92 @@
+schema_version: "1"
+
+global_policy:
+  selection_mode: "capability-first"
+  read_first: true
+  write_requires_confirmation: true
+  prefer_high_trust: true
+  max_mcp_calls_per_task: 20
+  require_explicit_user_intent_for_write: true
+
+guardrails:
+  - "Do not execute write operations without explicit confirmation."
+  - "Do not use disabled providers."
+  - "Use only providers with required capabilities."
+  - "Record why a provider was selected for the current task."
+
+routing_rules:
+  - when:
+      task_type: "docs"
+      intent: "lookup-docs"
+      required_capabilities: ["docs", "search"]
+    action:
+      preferred_providers: ["context7"]
+      selection_strategy: "priority_then_trust"
+      on_unavailable: "fallback_chain"
+
+  - when:
+      task_type: "feature"
+      intent: "search-repo"
+      required_capabilities: ["repo_read", "search"]
+    action:
+      preferred_providers: ["gitlab-mcp-agent-server"]
+      selection_strategy: "priority_then_trust"
+      on_unavailable: "fallback_chain"
+
+  - when:
+      task_type: "feature"
+      intent: "manage-tasks"
+      required_capabilities: ["issues"]
+    action:
+      preferred_providers: ["gitlab-mcp-agent-server"]
+      selection_strategy: "priority_then_trust"
+      on_unavailable: "fallback_chain"
+
+  - when:
+      task_type: "frontend"
+      intent: "debug-ui"
+      required_capabilities: ["browser_inspect", "web_debug"]
+    action:
+      preferred_providers: ["chrome-devtools"]
+      selection_strategy: "priority_then_trust"
+      on_unavailable: "fallback_chain"
+
+  - when:
+      task_type: "architecture"
+      intent: "plan-solution"
+      required_capabilities: ["reasoning", "planning"]
+    action:
+      preferred_providers: ["sequential-thinking"]
+      selection_strategy: "priority_then_trust"
+      on_unavailable: "fallback_chain"
+
+  - when:
+      task_type: "feature"
+      intent: "recall-context"
+      required_capabilities: ["memory_read", "knowledge_graph"]
+    action:
+      preferred_providers: ["memory-knowledge-graph"]
+      selection_strategy: "priority_then_trust"
+      on_unavailable: "fallback_chain"
+
+fallback_chain:
+  - "try_alternative_enabled_provider"
+  - "use_local_context"
+  - "ask_targeted_user_questions"
+
+confirmation_policy:
+  require_for_capabilities:
+    - "repo_write"
+    - "issues_write"
+    - "memory_write"
+    - "web_debug"
+  confirmation_must_include:
+    - "what_will_change"
+    - "where_it_will_change"
+    - "rollback_or_mitigation"
+
+error_policy:
+  retry_count: 1
+  retry_backoff_ms: 500
+  on_hard_failure: "degrade_to_local"
+  report_format: "structured_concise"

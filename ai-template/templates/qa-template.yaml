@@ -1,0 +1,30 @@
+schema_version: "1"
+status: "not_started" # not_started | in_progress | completed
+
+sections:
+  - id: "project-context"
+    title: "Project Context"
+    required: true
+    questions:
+      - id: "project-goal"
+        question: "What is the main goal of this project?"
+        required: true
+        targets:
+          - "project/description.md"
+        help_text: "Describe business purpose and expected user value in 2-4 sentences."
+        example_answer: "A storefront app for local shops to manage catalog and online orders."
+        answer: null
+        answer_status: "missing" # missing | partial | complete
+        updated_at: null
+
+      - id: "tech-stack"
+        question: "What technologies are currently used in the project?"
+        required: true
+        targets:
+          - "project/tech-stack.yaml"
+          - "config.yaml"
+        help_text: "List runtime, framework, database, package manager, and test stack."
+        example_answer: "Node 24, TypeScript, Express, PostgreSQL, npm, Jest."
+        answer: null
+        answer_status: "missing"
+        updated_at: null

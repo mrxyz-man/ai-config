@@ -1,0 +1,114 @@
+schema_version: "1"
+
+defaults:
+  enabled_by_default: false
+  read_only_mode: true
+  require_confirmation_for_write: true
+  fallback_strategy: "local_then_ask_user"
+
+providers:
+  - id: "context7"
+    title: "Context7"
+    enabled: false
+    source: "global"
+    capabilities:
+      - "docs"
+      - "search"
+    operations:
+      read: "allow"
+      write: "deny"
+    trust_level: "high"
+    priority: 100
+    availability:
+      required: false
+      health_check_hint: "Query a known library ID to verify connectivity."
+    routing_tags:
+      - "documentation"
+      - "api-reference"
+
+  - id: "chrome-devtools"
+    title: "Chrome DevTools MCP"
+    enabled: false
+    source: "global"
+    capabilities:
+      - "browser_inspect"
+      - "web_debug"
+      - "performance_trace"
+      - "network_inspect"
+    operations:
+      read: "allow"
+      write: "confirm"
+    trust_level: "high"
+    priority: 95
+    availability:
+      required: false
+      health_check_hint: "Open a page and verify snapshot/network access."
+    routing_tags:
+      - "frontend-debug"
+      - "browser"
+
+  - id: "gitlab-mcp-agent-server"
+    title: "GitLab MCP Agent Server"
+    enabled: false
+    source: "project"
+    capabilities:
+      - "issues"
+      - "issues_write"
+      - "repo_read"
+      - "repo_write"
+      - "search"
+      - "merge_requests"
+      - "pipelines_read"
+    operations:
+      read: "allow"
+      write: "confirm"
+    trust_level: "high"
+    priority: 98
+    availability:
+      required: false
+      health_check_hint: "Verify projects/issues read operation."
+    routing_tags:
+      - "task-management"
+      - "code-search"
+      - "repository"
+      - "delivery"
+
+  - id: "sequential-thinking"
+    title: "Sequential Thinking"
+    enabled: false
+    source: "global"
+    capabilities:
+      - "reasoning"
+      - "planning"
+      - "decomposition"
+    operations:
+      read: "allow"
+      write: "deny"
+    trust_level: "high"
+    priority: 85
+    availability:
+      required: false
+      health_check_hint: "Run a short step-by-step reasoning task."
+    routing_tags:
+      - "planning"
+      - "analysis"
+
+  - id: "memory-knowledge-graph"
+    title: "Memory / Knowledge Graph"
+    enabled: false
+    source: "global"
+    capabilities:
+      - "memory_read"
+      - "memory_write"
+      - "knowledge_graph"
+    operations:
+      read: "allow"
+      write: "confirm"
+    trust_level: "medium"
+    priority: 80
+    availability:
+      required: false
+      health_check_hint: "Read and write a small test memory entry."
+    routing_tags:
+      - "memory"
+      - "context"

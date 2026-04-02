@@ -1,0 +1,101 @@
+schema_version: "1"
+id: "bug-fix"
+title: "Bug Fix Workflow"
+enabled: true
+applies_to_task_types:
+  - "bug"
+
+entry_conditions:
+  - "task_status_is_pending_or_in_progress"
+  - "bug_report_or_symptom_exists"
+
+steps:
+  - id: "triage_and_reproduce"
+    role: "developer"
+    skills:
+      - "context-hydration"
+      - "task-breakdown"
+    inputs:
+      - "bug_report"
+      - "logs_if_available"
+      - "affected_area"
+    outputs:
+      - "repro_steps"
+      - "impact_scope"
+      - "hypothesis_list"
+    on_success: "root_cause_analysis"
+    on_failure: "escalate_or_request_info"
+
+  - id: "root_cause_analysis"
+    role: "developer"
+    skills:
+      - "context-hydration"
+    inputs:
+      - "repro_steps"
+      - "code_context"
+    outputs:
+      - "root_cause"
+      - "fix_strategy"
+      - "risk_register"
+    on_success: "implement_fix"
+    on_failure: "escalate_or_block"
+
+  - id: "implement_fix"
+    role: "developer"
+    skills:
+      - "code-generation"
+    inputs:
+      - "fix_strategy"
+      - ".ai/rules/*"
+    outputs:
+      - "changed_files"
+      - "fix_summary"
+    on_success: "regression_validation"
+    on_failure: "retry_or_escalate"
+
+  - id: "regression_validation"
+    role: "tester"
+    fallback_role: "developer"
+    skills:
+      - "testing"
+    inputs:
+      - "repro_steps"
+      - "changed_files"
+    outputs:
+      - "regression_report"
+      - "remaining_risks"
+    on_success: "review"
+    on_failure: "implement_fix"
+
+  - id: "review"
+    role: "reviewer"
+    skills:
+      - "documentation"
+    inputs:
+      - "fix_summary"
+      - "regression_report"
+    outputs:
+      - "review_findings"
+      - "review_decision"
+    on_success: "complete_task"
+    on_failure: "implement_fix"
+
+  - id: "complete_task"
+    role: "developer"
+    skills:
+      - "documentation"
+    inputs:
+      - "review_decision"
+      - "fix_summary"
+    outputs:
+      - "postmortem_note"
+      - "final_summary"
+    on_success: "completed"
+    on_failure: "escalate_or_block"
+
+max_iterations: 3
+
+done_criteria:
+  - "bug_not_reproducible_after_fix_or_documented"
+  - "critical_regressions_absent"
+  - "review_passed"

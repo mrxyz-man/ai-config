@@ -1,0 +1,53 @@
+# Dependencies and package managers
+node_modules/
+.pnpm-store/
+.yarn/
+
+# Build artifacts
+dist/
+build/
+coverage/
+.next/
+out/
+
+# Caches and temp
+.cache/
+.turbo/
+tmp/
+temp/
+*.tmp
+
+# Logs and reports
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+
+# VCS and IDE
+.git/
+.idea/
+.vscode/
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Binary and archive files
+*.zip
+*.tar
+*.gz
+*.7z
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Language-specific bytecode
+__pycache__/
+*.pyc

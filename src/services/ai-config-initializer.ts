@@ -1,197 +1,151 @@
 import fs from "node:fs";
 import path from "node:path";
+import { stringify as toYaml } from "yaml";
 
-import YAML from "yaml";
+import {
+  AGENT_TO_BRIDGE_FILES,
+  BRIDGE_CONTENT_BY_FILE,
+  DEFAULT_AGENT,
+  type AgentKey
+} from "../core/agents";
+import { ConfigInitializerPort, InitReport } from "../core/ports";
+import { DEFAULT_CONFIG_ROOT, DEFAULT_TEMPLATE_ROOT } from "../core/config-paths";
+import { DEFAULT_UI_LOCALE } from "../core/locales";
 
-import { ConfigInitializerPort, ConfigResolverPort, InitIssue, InitReport } from "../core/ports";
+const resolveTemplateDir = (): string => path.resolve(__dirname, `../../${DEFAULT_TEMPLATE_ROOT}`);
+const MANIFEST_FILE_NAME = "manifest.yaml";
+const SCHEMA_VERSION = "1";
+const TEMPLATE_VERSION = "0.1.0";
 
-type InitOptions = {
-  force?: boolean;
-  lang?: string;
-  skipQuestions?: boolean;
-};
-
-const TEMPLATE_AI_DIR = path.resolve(__dirname, "../../ai");
-
-const toRelative = (projectRoot: string, absolutePath: string): string =>
-  path.relative(projectRoot, absolutePath).replace(/\\/g, "/");
-
-const readYamlObject = <T>(filePath: string): T => {
-  const raw = fs.readFileSync(filePath, "utf8");
-  return YAML.parse(raw) as T;
-};
-
-const writeYamlObject = (filePath: string, value: unknown): void => {
-  fs.writeFileSync(filePath, YAML.stringify(value), "utf8");
-};
-
-const ensureTemplateExists = (): void => {
-  if (!fs.existsSync(TEMPLATE_AI_DIR)) {
-    throw new Error(`Template directory is missing: ${TEMPLATE_AI_DIR}`);
+const writeBridgeFiles = (
+  projectRoot: string,
+  agent: AgentKey,
+  createdFiles: string[]
+): void => {
+  const files = AGENT_TO_BRIDGE_FILES[agent] ?? AGENT_TO_BRIDGE_FILES.other;
+  for (const fileName of files) {
+    fs.writeFileSync(path.join(projectRoot, fileName), BRIDGE_CONTENT_BY_FILE[fileName], "utf8");
+    createdFiles.push(fileName);
   }
 };
 
-const detectProject = (projectRoot: string): InitReport["detected"] => ({
-  hasPackageJson: fs.existsSync(path.join(projectRoot, "package.json")),
-  hasTypeScript: fs.existsSync(path.join(projectRoot, "tsconfig.json")),
-  hasNodeModules: fs.existsSync(path.join(projectRoot, "node_modules"))
-});
+const writeManifestFile = (params: {
+  targetDir: string;
+  selectedAgent: AgentKey;
+  uiLocale: string;
+  createdFiles: string[];
+  errors: InitReport["errors"];
+}): boolean => {
+  const manifestFilePath = path.join(params.targetDir, MANIFEST_FILE_NAME);
+  const manifestContent = toYaml({
+    schema_version: SCHEMA_VERSION,
+    created_at: new Date().toISOString(),
+    selected_agent: params.selectedAgent,
+    ui_locale: params.uiLocale,
+    template_version: TEMPLATE_VERSION,
+    qa_version: "1",
+    qa_completed: false,
+    qa_completed_at: null
+  });
 
-const copyTemplateAi = (
-  projectRoot: string,
-  force: boolean,
-  createdFiles: string[],
-  warnings: InitIssue[],
-  errors: InitIssue[]
-): boolean => {
-  const targetAiDir = path.join(projectRoot, "ai");
-  const exists = fs.existsSync(targetAiDir);
-  if (exists && !force) {
-    errors.push({
-      file: "ai",
-      message: "Target ./ai already exists. Use --force to re-bootstrap."
+  fs.writeFileSync(manifestFilePath, manifestContent, "utf8");
+  const stats = fs.statSync(manifestFilePath);
+  if (stats.size <= 0) {
+    params.errors.push({
+      file: `${DEFAULT_CONFIG_ROOT}/${MANIFEST_FILE_NAME}`,
+      message: "Manifest file was created but is empty."
     });
     return false;
   }
 
-  if (exists && force) {
-    warnings.push({
-      file: "ai",
-      message: "Existing ./ai reused in force mode; managed files may be overwritten."
-    });
-  } else {
-    fs.cpSync(TEMPLATE_AI_DIR, targetAiDir, { recursive: true });
-    createdFiles.push("ai/**");
-  }
-
+  params.createdFiles.push(`${DEFAULT_CONFIG_ROOT}/${MANIFEST_FILE_NAME}`);
   return true;
 };
 
 export class AiConfigInitializer implements ConfigInitializerPort {
-  constructor(private readonly resolver: ConfigResolverPort) {}
-
-  init(projectRoot: string, options?: InitOptions): InitReport {
+  init(
+    projectRoot: string,
+    options?: { force?: boolean; agent?: AgentKey; uiLocale?: string }
+  ): InitReport {
     const absoluteRoot = path.resolve(projectRoot);
     const createdFiles: string[] = [];
-    const updatedFiles: string[] = [];
-    const warnings: InitIssue[] = [];
-    const errors: InitIssue[] = [];
-    const unresolvedQuestions: string[] = [];
+    const warnings: InitReport["warnings"] = [];
+    const errors: InitReport["errors"] = [];
+    const selectedAgent = options?.agent ?? DEFAULT_AGENT;
+    const uiLocale = (options?.uiLocale ?? DEFAULT_UI_LOCALE).trim() || DEFAULT_UI_LOCALE;
 
+    const templateDir = resolveTemplateDir();
+    const targetDir = path.join(absoluteRoot, DEFAULT_CONFIG_ROOT);
     const force = options?.force === true;
-    const lang = options?.lang;
-    const skipQuestions = options?.skipQuestions === true;
 
-    try {
-      ensureTemplateExists();
-    } catch (error) {
+    if (!fs.existsSync(templateDir)) {
       errors.push({
-        file: "ai",
-        message: (error as Error).message
+        file: DEFAULT_TEMPLATE_ROOT,
+        message: `Template directory is missing: ${templateDir}`
       });
       return {
         ok: false,
         projectRoot: absoluteRoot,
+        selectedAgent,
+        uiLocale,
         createdFiles,
-        updatedFiles,
-        detected: detectProject(absoluteRoot),
-        unresolvedQuestions,
         warnings,
         errors
       };
     }
 
-    const copied = copyTemplateAi(absoluteRoot, force, createdFiles, warnings, errors);
-    if (!copied) {
-      return {
-        ok: false,
-        projectRoot: absoluteRoot,
+    if (fs.existsSync(targetDir)) {
+      if (!force) {
+        errors.push({
+          file: DEFAULT_CONFIG_ROOT,
+          message: `Target ./${DEFAULT_CONFIG_ROOT} already exists. Use --force to re-bootstrap.`
+        });
+        return {
+          ok: false,
+          projectRoot: absoluteRoot,
+          selectedAgent,
+          uiLocale,
+          createdFiles,
+          warnings,
+          errors
+        };
+      }
+
+      warnings.push({
+        file: DEFAULT_CONFIG_ROOT,
+        message: `Existing ./${DEFAULT_CONFIG_ROOT} removed in force mode.`
+      });
+      fs.rmSync(targetDir, { recursive: true, force: true });
+    }
+
+    fs.mkdirSync(targetDir, { recursive: true });
+    fs.cpSync(templateDir, targetDir, { recursive: true });
+    createdFiles.push(`${DEFAULT_CONFIG_ROOT}/**`);
+    let manifestOk = false;
+    try {
+      manifestOk = writeManifestFile({
+        targetDir,
+        selectedAgent,
+        uiLocale,
         createdFiles,
-        updatedFiles,
-        detected: detectProject(absoluteRoot),
-        unresolvedQuestions,
-        warnings,
         errors
-      };
+      });
+    } catch (error) {
+      errors.push({
+        file: `${DEFAULT_CONFIG_ROOT}/${MANIFEST_FILE_NAME}`,
+        message: `Failed to write manifest: ${error instanceof Error ? error.message : "unknown error"}`
+      });
     }
-
-    const detected = detectProject(absoluteRoot);
-
-    const projectYamlPath = path.join(absoluteRoot, "ai/project.yaml");
-    if (fs.existsSync(projectYamlPath)) {
-      const projectConfig = readYamlObject<Record<string, unknown>>(projectYamlPath);
-      const domains = Array.isArray(projectConfig.domains)
-        ? [...new Set([...(projectConfig.domains as string[]), detected.hasTypeScript ? "typescript" : "javascript"])]
-        : [detected.hasTypeScript ? "typescript" : "javascript"];
-
-      const runtimeEnvironment =
-        typeof projectConfig.runtime_environment === "object" && projectConfig.runtime_environment !== null
-          ? (projectConfig.runtime_environment as Record<string, unknown>)
-          : {};
-
-      runtimeEnvironment.shell = "powershell";
-      runtimeEnvironment.os_family = process.platform === "win32" ? "windows" : process.platform;
-
-      projectConfig.runtime_environment = runtimeEnvironment;
-      projectConfig.domains = domains;
-      writeYamlObject(projectYamlPath, projectConfig);
-      updatedFiles.push(toRelative(absoluteRoot, projectYamlPath));
-    }
-
-    const answersPath = path.join(absoluteRoot, "ai/questions/answers.yaml");
-    if (fs.existsSync(answersPath)) {
-      const answers = readYamlObject<Record<string, unknown>>(answersPath);
-      if (lang) {
-        answers.language_confirmed = lang;
-      }
-      answers.completed = !skipQuestions;
-      if (skipQuestions) {
-        unresolvedQuestions.push("project-goals");
-        unresolvedQuestions.push("coding-standards");
-      }
-      writeYamlObject(answersPath, answers);
-      updatedFiles.push(toRelative(absoluteRoot, answersPath));
-    }
-
-    const syncStatePath = path.join(absoluteRoot, "ai/state/sync-state.yaml");
-    if (fs.existsSync(syncStatePath)) {
-      const syncState = readYamlObject<Record<string, unknown>>(syncStatePath);
-      syncState.last_sync_at = new Date().toISOString();
-      syncState.last_sync_result = "init_completed";
-      writeYamlObject(syncStatePath, syncState);
-      updatedFiles.push(toRelative(absoluteRoot, syncStatePath));
-    }
-
-    const resolveReport = this.resolver.resolve(absoluteRoot);
-    if (!resolveReport.ok) {
-      errors.push(
-        ...resolveReport.errors.map((issue) => ({
-          file: issue.file,
-          message: issue.message,
-          path: issue.path
-        }))
-      );
-      warnings.push(
-        ...resolveReport.warnings.map((issue) => ({
-          file: issue.file,
-          message: issue.message,
-          path: issue.path
-        }))
-      );
-    } else {
-      updatedFiles.push(resolveReport.outputFile);
-    }
+    writeBridgeFiles(absoluteRoot, selectedAgent, createdFiles);
 
     return {
-      ok: errors.length === 0,
+      ok: manifestOk,
       projectRoot: absoluteRoot,
+      selectedAgent,
+      uiLocale,
       createdFiles,
-      updatedFiles,
-      detected,
-      unresolvedQuestions,
       warnings,
       errors
     };
   }
 }
-

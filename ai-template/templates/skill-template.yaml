@@ -1,0 +1,76 @@
+schema_version: "1"
+id: "skill-id"
+title: "Skill Title"
+enabled: true
+version: "1.0.0"
+
+purpose: "What this skill is used for."
+outcome: "Expected result after skill execution."
+
+triggers:
+  - "feature"
+  - "bug"
+
+compatible_roles:
+  - "developer"
+
+required_modules:
+  - "rules"
+
+preconditions:
+  - "Required source files are available."
+
+inputs:
+  - ".ai/manifest.yaml"
+  - ".ai/config.yaml"
+  - ".ai/rules/*"
+
+outputs:
+  - ".ai/<target-file>"
+
+output_mode: "structured-update" # append | replace | structured-update
+
+steps:
+  - "Step 1"
+  - "Step 2"
+
+decision_points:
+  - condition: "If required data is missing"
+    action: "Ask targeted questions and continue."
+
+fallback_steps:
+  - "Escalate with clear blocker summary."
+
+quality_checks:
+  - "Output is complete and consistent."
+  - "No conflicts with rules or modules."
+
+constraints:
+  - "Do not modify unrelated files."
+  - "Respect .aiignore and safety rules."
+
+escalation_rules:
+  - "Ambiguous requirements"
+  - "Conflicting constraints"
+
+handoff_to:
+  - "reviewer"
+
+handoff_payload:
+  - "summary"
+  - "changed_files"
+  - "open_risks"
+
+user_questions_policy:
+  ask_only_missing: true
+  max_questions_per_round: 5
+
+response_style:
+  format: "structured"
+  verbosity: "concise"
+
+telemetry_tags:
+  - "skill"
+  - "v1"
+
+notes: ""

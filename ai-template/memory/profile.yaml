@@ -1,0 +1,21 @@
+schema_version: "1"
+enabled: true
+mode: "hybrid" # local | mcp | hybrid
+
+retention:
+  short_term_ttl_days: 30
+  long_term_retention: "indefinite"
+
+confidence_levels:
+  - "low"
+  - "medium"
+  - "high"
+
+write_policy:
+  confirm_for_long_term: true
+  allow_short_term_without_confirmation: true
+
+conflict_resolution: "project_files_first"
+redaction_policy: "no_secrets_no_pii"
+
+notes: "Use memory to support context, not to override project source files."

@@ -1,0 +1,57 @@
+schema_version: "1"
+
+modules:
+  - name: "core"
+    path: "."
+    enabled: true
+    managed_by: "ai-config"
+
+  - name: "qa"
+    path: "qa.yaml"
+    enabled: true
+    managed_by: "ai-config"
+
+  - name: "project"
+    path: "project/"
+    enabled: false
+    managed_by: "user"
+
+  - name: "rules"
+    path: "rules/"
+    enabled: false
+    managed_by: "user"
+
+  - name: "agents"
+    path: "agents/"
+    enabled: false
+    managed_by: "user"
+
+  - name: "mcp"
+    path: "mcp/"
+    enabled: false
+    managed_by: "user"
+
+  - name: "skills"
+    path: "skills/"
+    enabled: false
+    managed_by: "user"
+
+  - name: "orchestration"
+    path: "orchestration/"
+    enabled: false
+    managed_by: "user"
+
+  - name: "templates"
+    path: "templates/"
+    enabled: false
+    managed_by: "user"
+
+  - name: "memory"
+    path: "memory/"
+    enabled: false
+    managed_by: "user"
+
+  - name: "logs"
+    path: "logs/"
+    enabled: false
+    managed_by: "user"

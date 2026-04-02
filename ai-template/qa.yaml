@@ -1,0 +1,9 @@
+schema_version: "1"
+status: "not_started" # not_started | in_progress | completed
+
+metadata:
+  source_template: "templates/qa-template.yaml"
+  hydration_owner: "ai-agent"
+  guidance: "Populate this file incrementally with targeted questions and answers."
+
+questions: []

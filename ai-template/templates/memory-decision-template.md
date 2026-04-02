@@ -1,0 +1,18 @@
+### ID: DEC-YYYYMMDD-001
+- Date: 2026-04-01
+- Title: Decision title
+- Status: proposed | accepted | superseded | deprecated
+- Context:
+  - Why this decision was needed.
+- Decision:
+  - What was decided.
+- Alternatives considered:
+  - Option A, Option B, and why they were not chosen.
+- Consequences:
+  - Positive and negative impacts.
+- Source refs:
+  - /path/to/file
+  - issue/task/pr reference
+- Confidence: low | medium | high
+- Supersedes: DEC-... (optional)
+- Superseded by: DEC-... (optional)

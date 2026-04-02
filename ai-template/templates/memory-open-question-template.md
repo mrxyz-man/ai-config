@@ -1,0 +1,13 @@
+### ID: Q-YYYYMMDD-001
+- Question: Clear question text
+- Category: product | architecture | data | ops | process
+- Blocking: true | false
+- Owner: user | developer | architect | tester
+- Created at: 2026-04-01T00:00:00Z
+- Last updated at: 2026-04-01T00:00:00Z
+- Suggested next action:
+  - Concrete follow-up step.
+- Linked targets:
+  - .ai/project/...
+  - .ai/rules/...
+- Status: open | answered | wontfix
