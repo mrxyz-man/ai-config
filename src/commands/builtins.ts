@@ -13,6 +13,7 @@ import { EXIT_CODE } from "../core/exit-codes";
 import {
   INIT_MODULES,
   INIT_PROFILES,
+  MODULE_LIFECYCLE_STATES,
   MCP_PROVIDER_IDS,
   PROFILE_TO_MODULES,
   PROVIDER_PRESETS,
@@ -145,6 +146,36 @@ const selectProfileInteractive = async (): Promise<InitProfile | null> => {
   }
 
   return answer as InitProfile;
+};
+
+const selectSetupModeInteractive = async (): Promise<"quick" | "advanced" | null> => {
+  if (!input.isTTY || !output.isTTY) {
+    return null;
+  }
+
+  const { isCancel, outro, select } = await import("@clack/prompts");
+  const answer = await select({
+    message: "Select init setup mode",
+    options: [
+      {
+        value: "quick",
+        label: "Quick",
+        hint: "profile defaults with minimal questions"
+      },
+      {
+        value: "advanced",
+        label: "Advanced",
+        hint: "customize modules and runtime options"
+      }
+    ]
+  });
+
+  if (isCancel(answer)) {
+    outro("Operation cancelled.");
+    return null;
+  }
+
+  return answer as "quick" | "advanced";
 };
 
 const selectModulesInteractive = async (profile: InitProfile): Promise<InitModuleName[] | null> => {
@@ -612,6 +643,7 @@ type ModuleEntry = {
   name: string;
   path: string;
   enabled: boolean;
+  state: string;
 };
 
 const readModuleEntries = (modulesConfig: Record<string, unknown>): ModuleEntry[] => {
@@ -629,7 +661,8 @@ const readModuleEntries = (modulesConfig: Record<string, unknown>): ModuleEntry[
     entries.push({
       name: typeof entry.name === "string" ? entry.name : "",
       path: typeof entry.path === "string" ? entry.path : "",
-      enabled: entry.enabled === true
+      enabled: entry.enabled === true,
+      state: typeof entry.state === "string" ? entry.state : ""
     });
   }
 
@@ -690,6 +723,137 @@ const validateModulesContent = (
   }
 
   return errors;
+};
+
+const validateModuleLifecycleStates = (moduleEntries: ModuleEntry[]): InitIssue[] => {
+  const errors: InitIssue[] = [];
+  const knownStates = new Set<string>(MODULE_LIFECYCLE_STATES);
+
+  for (const moduleEntry of moduleEntries) {
+    if (!moduleEntry.name) {
+      continue;
+    }
+
+    if (!moduleEntry.state || !knownStates.has(moduleEntry.state)) {
+      errors.push({
+        file: asConfigFilePath("modules.yaml"),
+        message:
+          `Module "${moduleEntry.name}" has invalid state "${moduleEntry.state || "<missing>"}". ` +
+          `Use one of: ${MODULE_LIFECYCLE_STATES.join("|")}.`
+      });
+      continue;
+    }
+
+    if (!moduleEntry.enabled && moduleEntry.state !== "disabled") {
+      errors.push({
+        file: asConfigFilePath("modules.yaml"),
+        message: `Module "${moduleEntry.name}" is disabled but state is "${moduleEntry.state}" (expected "disabled").`
+      });
+    }
+  }
+
+  return errors;
+};
+
+const validateEnabledModuleReadiness = (
+  aiRoot: string,
+  moduleEntries: ModuleEntry[]
+): { errors: InitIssue[]; warnings: InitIssue[] } => {
+  const errors: InitIssue[] = [];
+  const warnings: InitIssue[] = [];
+  const byName = new Map<string, ModuleEntry>(moduleEntries.map((entry) => [entry.name, entry]));
+
+  const assertPathExists = (
+    relativePath: string,
+    severity: "error" | "warning",
+    message: string
+  ): void => {
+    const absolutePath = path.join(aiRoot, relativePath);
+    if (fs.existsSync(absolutePath)) {
+      return;
+    }
+    const issue = { file: asConfigFilePath(relativePath.replace(/\\/g, "/")), message };
+    if (severity === "error") {
+      errors.push(issue);
+      return;
+    }
+    warnings.push(issue);
+  };
+
+  const enabledEntries = moduleEntries.filter((entry) => entry.enabled);
+  for (const entry of enabledEntries) {
+    if (entry.state === "degraded") {
+      warnings.push({
+        file: asConfigFilePath("modules.yaml"),
+        message: `Module "${entry.name}" is enabled with state "degraded".`
+      });
+    }
+  }
+
+  if (byName.get("project")?.enabled) {
+    assertPathExists("project/description.md", "error", "Project module requires project/description.md.");
+    assertPathExists("project/tech-stack.yaml", "error", "Project module requires project/tech-stack.yaml.");
+  }
+
+  if (byName.get("rules")?.enabled) {
+    assertPathExists("rules/text-and-locale.md", "error", "Rules module requires rules/text-and-locale.md.");
+  }
+
+  if (byName.get("agents")?.enabled) {
+    assertPathExists("agents/registry.yaml", "error", "Agents module requires agents/registry.yaml.");
+  }
+
+  if (byName.get("mcp")?.enabled) {
+    assertPathExists("mcp/registry.yaml", "error", "MCP module requires mcp/registry.yaml.");
+    assertPathExists("mcp/policies.yaml", "error", "MCP module requires mcp/policies.yaml.");
+  }
+
+  if (byName.get("skills")?.enabled) {
+    assertPathExists("skills/registry.yaml", "error", "Skills module requires skills/registry.yaml.");
+  }
+
+  if (byName.get("orchestration")?.enabled) {
+    assertPathExists(
+      "orchestration/orchestration.yaml",
+      "error",
+      "Orchestration module requires orchestration/orchestration.yaml."
+    );
+    assertPathExists(
+      "orchestration/workflows",
+      "error",
+      "Orchestration module requires orchestration/workflows directory."
+    );
+  }
+
+  if (byName.get("templates")?.enabled) {
+    assertPathExists("templates/qa-template.yaml", "warning", "Templates module should include templates/qa-template.yaml.");
+  }
+
+  if (byName.get("memory")?.enabled) {
+    const memoryProfilePath = path.join(aiRoot, "memory", "profile.yaml");
+    const memoryProfile = readYamlObject(memoryProfilePath, asConfigFilePath("memory/profile.yaml"));
+    errors.push(...memoryProfile.errors);
+    if (memoryProfile.content && memoryProfile.content.enabled !== true) {
+      warnings.push({
+        file: asConfigFilePath("memory/profile.yaml"),
+        message: "Memory module is enabled but memory/profile.yaml has enabled != true."
+      });
+    }
+  }
+
+  if (byName.get("logs")?.enabled) {
+    const logsPolicyPath = path.join(aiRoot, "logs", "policy.yaml");
+    const logsPolicy = readYamlObject(logsPolicyPath, asConfigFilePath("logs/policy.yaml"));
+    errors.push(...logsPolicy.errors);
+    if (logsPolicy.content && logsPolicy.content.enabled !== true) {
+      warnings.push({
+        file: asConfigFilePath("logs/policy.yaml"),
+        message: "Logs module is enabled but logs/policy.yaml has enabled != true."
+      });
+    }
+  }
+
+  return { errors, warnings };
 };
 
 const validateSkillsRegistryAgainstModules = (
@@ -962,118 +1126,153 @@ export const builtInCommands: CommandDefinition[] = [
               }
               profile = selectedProfile;
 
-              const selectedModules = await selectModulesInteractive(profile);
-              if (!selectedModules) {
+              const setupMode = await selectSetupModeInteractive();
+              if (!setupMode) {
                 const envelope = createEnvelope({
                   ok: false,
                   command: "init",
                   data: {},
                   warnings: [],
-                  errors: [{ message: "Module selection was cancelled." }]
+                  errors: [{ message: "Setup mode selection was cancelled." }]
                 });
                 emitEnvelope(envelope, options.format);
                 process.exitCode = EXIT_CODE.USAGE;
                 return;
               }
 
-              const resolved = resolveInitConfig(
-                {
-                  profile,
-                  modules: selectedModules
-                },
-                {
-                  autoFixDependencies: true
-                }
-              );
-              modules = resolved.modules;
-              taskMode = resolved.taskMode;
-              questionnaireOnInit = resolved.questionnaireOnInit;
-              if (resolved.autoAddedModules.length > 0) {
-                initWarnings.push({
-                  message:
-                    `Auto-enabled dependent modules: ${resolved.autoAddedModules.join(", ")}.`
-                });
-              }
-
-              const selectedTaskMode = await selectTaskModeInteractive();
-              if (!selectedTaskMode) {
-                const envelope = createEnvelope({
-                  ok: false,
-                  command: "init",
-                  data: {},
-                  warnings: [],
-                  errors: [{ message: "Task mode selection was cancelled." }]
-                });
-                emitEnvelope(envelope, options.format);
-                process.exitCode = EXIT_CODE.USAGE;
-                return;
-              }
-              const taskResolved = resolveInitConfig(
-                {
-                  profile,
-                  modules,
-                  taskMode: selectedTaskMode,
-                  questionnaireOnInit: questionnaireOnInit ?? undefined
-                },
-                {
-                  autoFixDependencies: true
-                }
-              );
-              taskMode = taskResolved.taskMode;
-
-              const selectedQuestionnaireOnInit = await selectQuestionnaireOnInitInteractive();
-              if (selectedQuestionnaireOnInit === null) {
-                const envelope = createEnvelope({
-                  ok: false,
-                  command: "init",
-                  data: {},
-                  warnings: [],
-                  errors: [{ message: "Questionnaire selection was cancelled." }]
-                });
-                emitEnvelope(envelope, options.format);
-                process.exitCode = EXIT_CODE.USAGE;
-                return;
-              }
-              const qaResolved = resolveInitConfig(
-                {
-                  profile,
-                  modules,
-                  taskMode: taskMode ?? undefined,
-                  questionnaireOnInit: selectedQuestionnaireOnInit
-                },
-                {
-                  autoFixDependencies: true
-                }
-              );
-              questionnaireOnInit = qaResolved.questionnaireOnInit;
-
-              if (modules.includes("mcp")) {
-                const selectedProviders = await selectMcpProvidersInteractive(profile);
-                if (!selectedProviders) {
-                  const envelope = createEnvelope({
-                    ok: false,
-                    command: "init",
-                    data: {},
-                    warnings: [],
-                    errors: [{ message: "MCP providers selection was cancelled." }]
-                  });
-                  emitEnvelope(envelope, options.format);
-                  process.exitCode = EXIT_CODE.USAGE;
-                  return;
-                }
-                const providerResolved = resolveInitConfig(
+              if (setupMode === "quick") {
+                const quickResolved = resolveInitConfig(
                   {
-                    profile,
-                    modules,
-                    taskMode: taskMode ?? undefined,
-                    questionnaireOnInit: questionnaireOnInit ?? undefined,
-                    enableMcpProviders: selectedProviders
+                    profile
                   },
                   {
                     autoFixDependencies: true
                   }
                 );
-                enableMcpProviders = providerResolved.enableMcpProviders;
+                modules = quickResolved.modules;
+                taskMode = quickResolved.taskMode;
+                questionnaireOnInit = quickResolved.questionnaireOnInit;
+                enableMcpProviders = quickResolved.enableMcpProviders;
+                if (quickResolved.autoAddedModules.length > 0) {
+                  initWarnings.push({
+                    message:
+                      `Auto-enabled dependent modules: ${quickResolved.autoAddedModules.join(", ")}.`
+                  });
+                }
+              } else {
+                const selectedModules = await selectModulesInteractive(profile);
+                if (!selectedModules) {
+                  const envelope = createEnvelope({
+                    ok: false,
+                    command: "init",
+                    data: {},
+                    warnings: [],
+                    errors: [{ message: "Module selection was cancelled." }]
+                  });
+                  emitEnvelope(envelope, options.format);
+                  process.exitCode = EXIT_CODE.USAGE;
+                  return;
+                }
+
+                const resolved = resolveInitConfig(
+                  {
+                    profile,
+                    modules: selectedModules
+                  },
+                  {
+                    autoFixDependencies: true
+                  }
+                );
+                modules = resolved.modules;
+                taskMode = resolved.taskMode;
+                questionnaireOnInit = resolved.questionnaireOnInit;
+                if (resolved.autoAddedModules.length > 0) {
+                  initWarnings.push({
+                    message:
+                      `Auto-enabled dependent modules: ${resolved.autoAddedModules.join(", ")}.`
+                  });
+                }
+
+                const selectedTaskMode = await selectTaskModeInteractive();
+                if (!selectedTaskMode) {
+                  const envelope = createEnvelope({
+                    ok: false,
+                    command: "init",
+                    data: {},
+                    warnings: [],
+                    errors: [{ message: "Task mode selection was cancelled." }]
+                  });
+                  emitEnvelope(envelope, options.format);
+                  process.exitCode = EXIT_CODE.USAGE;
+                  return;
+                }
+                const taskResolved = resolveInitConfig(
+                  {
+                    profile,
+                    modules,
+                    taskMode: selectedTaskMode,
+                    questionnaireOnInit: questionnaireOnInit ?? undefined
+                  },
+                  {
+                    autoFixDependencies: true
+                  }
+                );
+                taskMode = taskResolved.taskMode;
+
+                const selectedQuestionnaireOnInit = await selectQuestionnaireOnInitInteractive();
+                if (selectedQuestionnaireOnInit === null) {
+                  const envelope = createEnvelope({
+                    ok: false,
+                    command: "init",
+                    data: {},
+                    warnings: [],
+                    errors: [{ message: "Questionnaire selection was cancelled." }]
+                  });
+                  emitEnvelope(envelope, options.format);
+                  process.exitCode = EXIT_CODE.USAGE;
+                  return;
+                }
+                const qaResolved = resolveInitConfig(
+                  {
+                    profile,
+                    modules,
+                    taskMode: taskMode ?? undefined,
+                    questionnaireOnInit: selectedQuestionnaireOnInit
+                  },
+                  {
+                    autoFixDependencies: true
+                  }
+                );
+                questionnaireOnInit = qaResolved.questionnaireOnInit;
+
+                if (modules.includes("mcp")) {
+                  const selectedProviders = await selectMcpProvidersInteractive(profile);
+                  if (!selectedProviders) {
+                    const envelope = createEnvelope({
+                      ok: false,
+                      command: "init",
+                      data: {},
+                      warnings: [],
+                      errors: [{ message: "MCP providers selection was cancelled." }]
+                    });
+                    emitEnvelope(envelope, options.format);
+                    process.exitCode = EXIT_CODE.USAGE;
+                    return;
+                  }
+                  const providerResolved = resolveInitConfig(
+                    {
+                      profile,
+                      modules,
+                      taskMode: taskMode ?? undefined,
+                      questionnaireOnInit: questionnaireOnInit ?? undefined,
+                      enableMcpProviders: selectedProviders
+                    },
+                    {
+                      autoFixDependencies: true
+                    }
+                  );
+                  enableMcpProviders = providerResolved.enableMcpProviders;
+                }
               }
 
               const confirmed = await confirmInitConfigurationInteractive({
@@ -1081,8 +1280,8 @@ export const builtInCommands: CommandDefinition[] = [
                 uiLocale,
                 profile,
                 modules,
-                taskMode,
-                questionnaireOnInit,
+                taskMode: taskMode ?? "off",
+                questionnaireOnInit: questionnaireOnInit ?? false,
                 enableMcpProviders
               });
               if (!confirmed) {
@@ -1409,6 +1608,10 @@ export const builtInCommands: CommandDefinition[] = [
             if (modulesReadResult.content) {
               errors.push(...validateModulesContent(modulesReadResult.content, aiRoot));
               const moduleEntries = readModuleEntries(modulesReadResult.content);
+              errors.push(...validateModuleLifecycleStates(moduleEntries));
+              const readiness = validateEnabledModuleReadiness(aiRoot, moduleEntries);
+              errors.push(...readiness.errors);
+              warnings.push(...readiness.warnings);
               const declaredModuleNames = new Set<string>(
                 moduleEntries
                   .map((entry) => entry.name)

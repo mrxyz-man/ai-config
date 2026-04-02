@@ -219,6 +219,16 @@ export const buildSyncPlan = (projectRoot: string): SyncPlan => {
             relativePath,
             reason: "Safe merge is configured but YAML parsing failed. Resolve manually."
           });
+          recommendations.push({
+            path: displayPath,
+            strategy: "manual_merge",
+            message:
+              "Parse error detected while attempting safe merge. Fix YAML syntax first, then re-run sync.",
+            suggestedCommands: [
+              `ai-config sync --cwd ${projectRoot} --format json`,
+              `ai-config validate --cwd ${projectRoot} --format json`
+            ]
+          });
           continue;
         }
         if (mergeResult.merged) {

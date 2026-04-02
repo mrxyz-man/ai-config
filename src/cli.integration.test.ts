@@ -438,8 +438,13 @@ describe("CLI smoke flows", () => {
     const modules = modulesConfig.modules as Array<Record<string, unknown>>;
     const getModuleEnabled = (name: string): boolean =>
       modules.find((moduleDef) => moduleDef.name === name)?.enabled === true;
+    const getModuleState = (name: string): string | undefined =>
+      modules.find((moduleDef) => moduleDef.name === name)?.state as string | undefined;
     expect(getModuleEnabled("mcp")).toBe(true);
     expect(getModuleEnabled("skills")).toBe(true);
+    expect(getModuleState("mcp")).toBe("bootstrap");
+    expect(getModuleState("skills")).toBe("bootstrap");
+    expect(getModuleState("logs")).toBe("disabled");
 
     const qaRaw = fs.readFileSync(path.join(projectPath, ".ai", "qa.yaml"), "utf8");
     const qa = parseYaml(qaRaw) as Record<string, unknown>;
@@ -471,6 +476,33 @@ describe("CLI smoke flows", () => {
     const logsRaw = fs.readFileSync(path.join(projectPath, ".ai", "logs", "policy.yaml"), "utf8");
     const logs = parseYaml(logsRaw) as Record<string, unknown>;
     expect(logs.enabled).toBe(false);
+  });
+
+  test("sync provides recommendation for parse-error conflict in modules.yaml", () => {
+    const projectPath = createTempProject();
+    const initResult = runCli([
+      "init",
+      "--cwd",
+      projectPath,
+      "--non-interactive",
+      "--agent",
+      "codex",
+      "--ui-locale",
+      "en",
+      "--format",
+      "json"
+    ]);
+    expect(initResult.status).toBe(0);
+
+    const modulesPath = path.join(projectPath, ".ai", "modules.yaml");
+    fs.writeFileSync(modulesPath, "schema_version: '1'\nmodules: [invalid\n", "utf8");
+
+    const syncResult = runCli(["sync", "--cwd", projectPath, "--format", "json"]);
+    expect(syncResult.status).toBe(0);
+    expect(syncResult.stdout).toContain("\"type\": \"conflict_file\"");
+    expect(syncResult.stdout).toContain(".ai/modules.yaml");
+    expect(syncResult.stdout).toContain("\"recommendations\": [");
+    expect(syncResult.stdout).toContain("Parse error detected while attempting safe merge");
   });
 
   test("init fails with usage error on invalid profile in non-interactive mode", () => {

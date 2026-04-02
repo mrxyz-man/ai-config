@@ -11,8 +11,8 @@ This module stores reusable project context for AI-assisted work.
 
 ## Principles
 
-- Long-term memory stores confirmed knowledge only.
-- Short-term memory is temporary and can be pruned.
-- Each entry should include source references and confidence level.
-- Project files remain source-of-truth in case of conflicts.
-- Do not store secrets or sensitive personal data.
+- Long-term memory MUST store confirmed knowledge only.
+- Short-term memory MUST be treated as temporary and can be pruned.
+- Each entry MUST include source references and confidence level.
+- Project files MUST remain source-of-truth in case of conflicts.
+- Memory MUST NOT store secrets or sensitive personal data.

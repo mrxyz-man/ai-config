@@ -4,54 +4,65 @@ modules:
   - name: "core"
     path: "."
     enabled: true
+    state: "bootstrap" # disabled | bootstrap | ready | degraded
     managed_by: "ai-config"
 
   - name: "qa"
     path: "qa.yaml"
     enabled: true
+    state: "bootstrap"
     managed_by: "ai-config"
 
   - name: "project"
     path: "project/"
     enabled: false
+    state: "disabled"
     managed_by: "user"
 
   - name: "rules"
     path: "rules/"
     enabled: false
+    state: "disabled"
     managed_by: "user"
 
   - name: "agents"
     path: "agents/"
     enabled: false
+    state: "disabled"
     managed_by: "user"
 
   - name: "mcp"
     path: "mcp/"
     enabled: false
+    state: "disabled"
     managed_by: "user"
 
   - name: "skills"
     path: "skills/"
     enabled: false
+    state: "disabled"
     managed_by: "user"
 
   - name: "orchestration"
     path: "orchestration/"
     enabled: false
+    state: "disabled"
     managed_by: "user"
 
   - name: "templates"
     path: "templates/"
     enabled: false
+    state: "disabled"
     managed_by: "user"
 
   - name: "memory"
     path: "memory/"
     enabled: false
+    state: "disabled"
     managed_by: "user"
 
   - name: "logs"
     path: "logs/"
     enabled: false
+    state: "disabled"
     managed_by: "user"

@@ -13,6 +13,6 @@ This module defines how AI agents should use MCP providers in a safe and predict
 
 - Capability-first, not vendor-first.
 - MCP usage is optional; no MCP must not block baseline workflow.
-- Read-first policy by default.
-- Write operations require explicit confirmation.
-- Every scenario must have a fallback path.
+- Read-first policy MUST be the default.
+- Write operations MUST require explicit confirmation.
+- Every scenario MUST include a fallback path.

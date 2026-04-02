@@ -135,7 +135,9 @@ const updateModulesFile = (params: {
     if (typeof moduleName !== "string") {
       continue;
     }
-    moduleRecord.enabled = enabledSet.has(moduleName as InitModuleName);
+    const isEnabled = enabledSet.has(moduleName as InitModuleName);
+    moduleRecord.enabled = isEnabled;
+    moduleRecord.state = isEnabled ? "bootstrap" : "disabled";
   }
 
   writeYamlObject(absolutePath, current);

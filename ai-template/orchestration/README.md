@@ -11,8 +11,8 @@ This module defines how tasks move through roles, skills, and quality gates.
 
 ## Principles
 
-- One active workflow per task.
-- Explicit step transitions and handoffs.
-- Quality gates required before completion.
-- Controlled retries and clear escalation path.
-- If a workflow step role is disabled or unavailable, use step-level `fallback_role`.
+- One active workflow per task MUST be enforced.
+- Step transitions and handoffs MUST be explicit.
+- Quality gates MUST pass before completion.
+- Retries MUST be controlled and escalation path MUST be clear.
+- If a workflow step role is disabled or unavailable, step-level `fallback_role` MUST be used.

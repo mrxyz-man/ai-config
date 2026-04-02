@@ -19,6 +19,14 @@ export const INIT_MODULES = [
 ] as const;
 export type InitModuleName = (typeof INIT_MODULES)[number];
 
+export const MODULE_LIFECYCLE_STATES = [
+  "disabled",
+  "bootstrap",
+  "ready",
+  "degraded"
+] as const;
+export type ModuleLifecycleState = (typeof MODULE_LIFECYCLE_STATES)[number];
+
 export const MCP_PROVIDER_IDS = [
   "context7",
   "chrome-devtools",
