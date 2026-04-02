@@ -21,19 +21,26 @@ Current behavior:
   - enabled module paths existence
   - cross-module checks (`skills.required_modules`, workflow `role`/`fallback_role`)
 
-Run:
+Quick Start (recommended):
 
 ```bash
-npm install
-npm run build
-node dist/cli.js init --cwd <project-path>
-node dist/cli.js init --cwd <project-path> --non-interactive --agent codex --ui-locale en
-node dist/cli.js validate --cwd <project-path>
+npx @mrxyz/ai-config@latest init --cwd <project-path>
+npx @mrxyz/ai-config@latest init --cwd <project-path> --non-interactive --agent codex --ui-locale en
+npx @mrxyz/ai-config@latest validate --cwd <project-path>
 ```
 
 Requirements:
 - Node `24.14.0+`
 - npm `11+`
+
+Development (local repository):
+
+```bash
+npm install
+npm run build
+node dist/cli.js init --cwd <project-path>
+node dist/cli.js validate --cwd <project-path>
+```
 
 Exit codes:
 - `0` success
