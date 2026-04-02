@@ -1,0 +1,22 @@
+schema_version: "1"
+
+gates:
+  - id: "typecheck"
+    required: true
+    command: "npm run typecheck"
+    fail_on_error: true
+
+  - id: "lint"
+    required: true
+    command: "npm run lint"
+    fail_on_error: true
+
+  - id: "tests"
+    required: true
+    command: "npm test"
+    fail_on_error: true
+
+  - id: "build"
+    required: true
+    command: "npm run build"
+    fail_on_error: true

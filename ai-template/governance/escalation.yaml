@@ -1,0 +1,17 @@
+schema_version: "1"
+
+triggers:
+  - id: "security-risk"
+    condition: "Potential security vulnerability or sensitive data exposure."
+    escalate_to: ["reviewer", "architect"]
+  - id: "breaking-change"
+    condition: "Backwards compatibility might be broken."
+    escalate_to: ["architect"]
+  - id: "low-confidence"
+    condition: "Agent confidence is low or requirements are ambiguous."
+    escalate_to: ["user", "reviewer"]
+
+policy:
+  require_risk_summary: true
+  require_options_comparison: true
+  block_merge_until_resolution: true

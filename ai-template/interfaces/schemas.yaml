@@ -1,0 +1,31 @@
+schema_version: "1"
+
+shared_schemas:
+  - id: "task-card"
+    version: "v1"
+    fields:
+      - name: "id"
+        type: "string"
+        required: true
+      - name: "title"
+        type: "string"
+        required: true
+      - name: "status"
+        type: "string"
+        required: true
+      - name: "risk_level"
+        type: "string"
+        required: false
+
+  - id: "qa-item"
+    version: "v1"
+    fields:
+      - name: "id"
+        type: "string"
+        required: true
+      - name: "question"
+        type: "string"
+        required: true
+      - name: "answer"
+        type: "string"
+        required: false

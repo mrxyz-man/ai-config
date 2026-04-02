@@ -1,0 +1,13 @@
+schema_version: "1"
+
+policy:
+  block_merge_on_failed_gate: true
+  require_risk_summary_for_exceptions: true
+  require_reviewer_ack_for_exceptions: true
+
+thresholds:
+  test_coverage_min_percent: 0
+  max_high_severity_findings: 0
+
+notes:
+  - "Tune thresholds per project maturity and stack constraints."

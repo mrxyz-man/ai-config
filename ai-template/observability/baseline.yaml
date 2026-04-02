@@ -1,0 +1,18 @@
+schema_version: "1"
+
+logging:
+  structured_logs: true
+  redact_sensitive_data: true
+  include_request_id: true
+
+metrics:
+  enabled: true
+  core_signals:
+    - "request_rate"
+    - "error_rate"
+    - "latency_p95"
+
+tracing:
+  enabled: true
+  propagate_trace_context: true
+  sample_strategy: "tail-based or rate-limited"

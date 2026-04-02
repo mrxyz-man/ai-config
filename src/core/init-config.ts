@@ -13,6 +13,16 @@ export const INIT_MODULES = [
   "mcp",
   "skills",
   "orchestration",
+  "contracts",
+  "checklists",
+  "adr",
+  "governance",
+  "interfaces",
+  "runbooks",
+  "risk",
+  "quality",
+  "security",
+  "observability",
   "templates",
   "memory",
   "logs"
@@ -44,7 +54,25 @@ type InitBehaviorDefaults = {
 
 export const PROFILE_TO_MODULES: Record<InitProfile, readonly InitModuleName[]> = {
   minimal: ["core", "qa"],
-  standard: ["core", "qa", "project", "rules", "agents", "skills", "templates"],
+  standard: [
+    "core",
+    "qa",
+    "project",
+    "rules",
+    "agents",
+    "skills",
+    "contracts",
+    "checklists",
+    "adr",
+    "governance",
+    "interfaces",
+    "runbooks",
+    "risk",
+    "quality",
+    "security",
+    "observability",
+    "templates"
+  ],
   full: INIT_MODULES
 };
 
@@ -75,6 +103,16 @@ export const MODULE_DEPENDENCIES: Record<InitModuleName, readonly InitModuleName
   mcp: [],
   skills: ["rules", "templates"],
   orchestration: ["agents"],
+  contracts: [],
+  checklists: [],
+  adr: [],
+  governance: [],
+  interfaces: [],
+  runbooks: [],
+  risk: [],
+  quality: [],
+  security: [],
+  observability: [],
   templates: [],
   memory: [],
   logs: []

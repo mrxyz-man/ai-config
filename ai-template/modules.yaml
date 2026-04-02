@@ -49,6 +49,66 @@ modules:
     state: "disabled"
     managed_by: "user"
 
+  - name: "contracts"
+    path: "contracts/"
+    enabled: false
+    state: "disabled"
+    managed_by: "user"
+
+  - name: "checklists"
+    path: "checklists/"
+    enabled: false
+    state: "disabled"
+    managed_by: "user"
+
+  - name: "adr"
+    path: "adr/"
+    enabled: false
+    state: "disabled"
+    managed_by: "user"
+
+  - name: "governance"
+    path: "governance/"
+    enabled: false
+    state: "disabled"
+    managed_by: "user"
+
+  - name: "interfaces"
+    path: "interfaces/"
+    enabled: false
+    state: "disabled"
+    managed_by: "user"
+
+  - name: "runbooks"
+    path: "runbooks/"
+    enabled: false
+    state: "disabled"
+    managed_by: "user"
+
+  - name: "risk"
+    path: "risk/"
+    enabled: false
+    state: "disabled"
+    managed_by: "user"
+
+  - name: "quality"
+    path: "quality/"
+    enabled: false
+    state: "disabled"
+    managed_by: "user"
+
+  - name: "security"
+    path: "security/"
+    enabled: false
+    state: "disabled"
+    managed_by: "user"
+
+  - name: "observability"
+    path: "observability/"
+    enabled: false
+    state: "disabled"
+    managed_by: "user"
+
   - name: "templates"
     path: "templates/"
     enabled: false

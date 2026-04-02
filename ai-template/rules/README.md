@@ -13,3 +13,16 @@ This module contains development rules used by AI agents and team members.
 - Keep stable, universal rules prefilled.
 - Keep project-dependent rules as guidance comments and fill them from project context.
 
+## Baseline Files
+
+- `coding-standards.md`
+- `architecture.md`
+- `testing.md`
+- `git.md`
+- `review.md`
+- `text-and-locale.md`
+- `patterns.md`
+- `anti-patterns.md`
+- `decision-log-policy.md`
+- `api-compatibility.md`
+- `data-handling.md`

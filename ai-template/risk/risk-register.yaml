@@ -1,0 +1,20 @@
+schema_version: "1"
+
+risks:
+  - id: "R-001"
+    title: "Ambiguous requirements"
+    category: "product"
+    probability: "medium"
+    impact: "high"
+    owner_role: "architect"
+    status: "open"
+    mitigation_ref: "mitigation-plan.md#r-001"
+
+  - id: "R-002"
+    title: "Integration dependency drift"
+    category: "technical"
+    probability: "medium"
+    impact: "medium"
+    owner_role: "developer"
+    status: "open"
+    mitigation_ref: "mitigation-plan.md#r-002"

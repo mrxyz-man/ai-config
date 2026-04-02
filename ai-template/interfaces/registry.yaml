@@ -1,0 +1,16 @@
+schema_version: "1"
+
+interfaces:
+  - id: "internal-cli-config"
+    type: "internal"
+    status: "draft"
+    owner_role: "architect"
+    source: ".ai/config.yaml"
+    compatibility_policy: "backward-compatible by default"
+
+  - id: "external-task-provider"
+    type: "external"
+    status: "optional"
+    owner_role: "developer"
+    source: "mcp/registry.yaml"
+    compatibility_policy: "adapter-based integration"

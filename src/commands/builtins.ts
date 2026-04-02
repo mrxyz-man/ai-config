@@ -825,6 +825,137 @@ const validateEnabledModuleReadiness = (
     );
   }
 
+  if (byName.get("contracts")?.enabled) {
+    assertPathExists("contracts/README.md", "error", "Contracts module requires contracts/README.md.");
+    assertPathExists(
+      "contracts/module-contract-template.md",
+      "error",
+      "Contracts module requires contracts/module-contract-template.md."
+    );
+  }
+
+  if (byName.get("checklists")?.enabled) {
+    assertPathExists("checklists/README.md", "error", "Checklists module requires checklists/README.md.");
+    assertPathExists(
+      "checklists/pr-checklist.md",
+      "error",
+      "Checklists module requires checklists/pr-checklist.md."
+    );
+    assertPathExists(
+      "checklists/release-checklist.md",
+      "error",
+      "Checklists module requires checklists/release-checklist.md."
+    );
+  }
+
+  if (byName.get("adr")?.enabled) {
+    assertPathExists("adr/README.md", "error", "ADR module requires adr/README.md.");
+    assertPathExists("adr/template.md", "error", "ADR module requires adr/template.md.");
+    assertPathExists("adr/records", "error", "ADR module requires adr/records directory.");
+  }
+
+  if (byName.get("governance")?.enabled) {
+    assertPathExists("governance/README.md", "error", "Governance module requires governance/README.md.");
+    assertPathExists(
+      "governance/ownership.yaml",
+      "error",
+      "Governance module requires governance/ownership.yaml."
+    );
+    assertPathExists(
+      "governance/escalation.yaml",
+      "error",
+      "Governance module requires governance/escalation.yaml."
+    );
+  }
+
+  if (byName.get("interfaces")?.enabled) {
+    assertPathExists("interfaces/README.md", "error", "Interfaces module requires interfaces/README.md.");
+    assertPathExists(
+      "interfaces/registry.yaml",
+      "error",
+      "Interfaces module requires interfaces/registry.yaml."
+    );
+    assertPathExists(
+      "interfaces/schemas.yaml",
+      "error",
+      "Interfaces module requires interfaces/schemas.yaml."
+    );
+  }
+
+  if (byName.get("runbooks")?.enabled) {
+    assertPathExists("runbooks/README.md", "error", "Runbooks module requires runbooks/README.md.");
+    assertPathExists(
+      "runbooks/incident-response.md",
+      "error",
+      "Runbooks module requires runbooks/incident-response.md."
+    );
+    assertPathExists(
+      "runbooks/release-ops.md",
+      "error",
+      "Runbooks module requires runbooks/release-ops.md."
+    );
+  }
+
+  if (byName.get("risk")?.enabled) {
+    assertPathExists("risk/README.md", "error", "Risk module requires risk/README.md.");
+    assertPathExists(
+      "risk/risk-register.yaml",
+      "error",
+      "Risk module requires risk/risk-register.yaml."
+    );
+    assertPathExists(
+      "risk/mitigation-plan.md",
+      "error",
+      "Risk module requires risk/mitigation-plan.md."
+    );
+  }
+
+  if (byName.get("quality")?.enabled) {
+    assertPathExists("quality/README.md", "error", "Quality module requires quality/README.md.");
+    assertPathExists(
+      "quality/gates.yaml",
+      "error",
+      "Quality module requires quality/gates.yaml."
+    );
+    assertPathExists(
+      "quality/profile.yaml",
+      "error",
+      "Quality module requires quality/profile.yaml."
+    );
+  }
+
+  if (byName.get("security")?.enabled) {
+    assertPathExists("security/README.md", "error", "Security module requires security/README.md.");
+    assertPathExists(
+      "security/controls.yaml",
+      "error",
+      "Security module requires security/controls.yaml."
+    );
+    assertPathExists(
+      "security/secrets-policy.md",
+      "error",
+      "Security module requires security/secrets-policy.md."
+    );
+  }
+
+  if (byName.get("observability")?.enabled) {
+    assertPathExists(
+      "observability/README.md",
+      "error",
+      "Observability module requires observability/README.md."
+    );
+    assertPathExists(
+      "observability/baseline.yaml",
+      "error",
+      "Observability module requires observability/baseline.yaml."
+    );
+    assertPathExists(
+      "observability/slo-policy.md",
+      "error",
+      "Observability module requires observability/slo-policy.md."
+    );
+  }
+
   if (byName.get("templates")?.enabled) {
     assertPathExists("templates/qa-template.yaml", "warning", "Templates module should include templates/qa-template.yaml.");
   }

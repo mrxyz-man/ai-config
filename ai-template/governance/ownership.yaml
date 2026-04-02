@@ -1,0 +1,15 @@
+schema_version: "1"
+
+owners:
+  - area: "architecture"
+    owner_role: "architect"
+    backup_role: "reviewer"
+  - area: "delivery"
+    owner_role: "developer"
+    backup_role: "reviewer"
+
+rules:
+  - id: "single-source-of-truth"
+    description: "Changes to AI configuration must be reflected in .ai modules and validated."
+  - id: "approval-required-high-risk"
+    description: "High-risk changes require explicit reviewer confirmation before merge."

@@ -1,0 +1,18 @@
+schema_version: "1"
+
+controls:
+  - id: "input-validation"
+    required: true
+    description: "Validate and sanitize untrusted input at boundaries."
+
+  - id: "authz-checks"
+    required: true
+    description: "Ensure authorization is enforced for protected operations."
+
+  - id: "dependency-risk"
+    required: true
+    description: "Track and remediate critical dependency vulnerabilities."
+
+  - id: "secure-logging"
+    required: true
+    description: "Prevent secrets and personal data leakage in logs."
