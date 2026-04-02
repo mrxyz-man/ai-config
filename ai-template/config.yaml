@@ -9,6 +9,23 @@ context:
   source_of_truth: ".ai/"
   respect_aiignore: true
   max_context_files: 200
+  context_priority:
+    - "rules"
+    - "project"
+    - "modules"
+    - "skills"
+    - "memory"
+    - "logs"
+
+conflict_resolution:
+  policy_order:
+    - "rules"
+    - "project"
+    - "config"
+    - "skills"
+    - "memory"
+    - "logs"
+  on_conflict: "prefer_higher_priority_and_report"
 
 behavior:
   ask_before_task_creation: true
@@ -22,6 +39,17 @@ modules:
 output:
   default_format: "human"
   include_warnings: true
+  provenance:
+    require_source_refs_for_critical_decisions: true
+    require_source_refs_for_external_claims: true
+    source_ref_format: "file_or_artifact_path"
+  confidence:
+    enabled: true
+    levels:
+      - "low"
+      - "medium"
+      - "high"
+    require_reason: true
 
 safety:
   allow_destructive_actions: false

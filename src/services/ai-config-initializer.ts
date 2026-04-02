@@ -11,6 +11,7 @@ import {
 import { ConfigInitializerPort, InitReport } from "../core/ports";
 import { DEFAULT_CONFIG_ROOT, DEFAULT_TEMPLATE_ROOT } from "../core/config-paths";
 import { DEFAULT_UI_LOCALE } from "../core/locales";
+import { detectPreflightState } from "../core/preflight";
 
 const resolveTemplateDir = (): string => path.resolve(__dirname, `../../${DEFAULT_TEMPLATE_ROOT}`);
 const MANIFEST_FILE_NAME = "manifest.yaml";
@@ -39,6 +40,8 @@ const writeManifestFile = (params: {
   const manifestFilePath = path.join(params.targetDir, MANIFEST_FILE_NAME);
   const manifestContent = toYaml({
     schema_version: SCHEMA_VERSION,
+    generator: "ai-config",
+    managed_by: "ai-config",
     created_at: new Date().toISOString(),
     selected_agent: params.selectedAgent,
     ui_locale: params.uiLocale,
@@ -68,6 +71,7 @@ export class AiConfigInitializer implements ConfigInitializerPort {
     options?: { force?: boolean; agent?: AgentKey; uiLocale?: string }
   ): InitReport {
     const absoluteRoot = path.resolve(projectRoot);
+    const preflight = detectPreflightState(absoluteRoot);
     const createdFiles: string[] = [];
     const warnings: InitReport["warnings"] = [];
     const errors: InitReport["errors"] = [];
@@ -85,6 +89,7 @@ export class AiConfigInitializer implements ConfigInitializerPort {
       });
       return {
         ok: false,
+        preflightState: preflight.state,
         projectRoot: absoluteRoot,
         selectedAgent,
         uiLocale,
@@ -96,12 +101,19 @@ export class AiConfigInitializer implements ConfigInitializerPort {
 
     if (fs.existsSync(targetDir)) {
       if (!force) {
+        const stateMessageByPreflight = {
+          managed: `Target ./${DEFAULT_CONFIG_ROOT} is already managed by ai-config. Re-run with --force to re-bootstrap.`,
+          foreign: `Target ./${DEFAULT_CONFIG_ROOT} exists and is not managed by ai-config. Re-run with --force to overwrite.`,
+          mixed: `Target ./${DEFAULT_CONFIG_ROOT} is in mixed state (managed + foreign markers). Resolve manually or re-run with --force.`,
+          fresh: `Target ./${DEFAULT_CONFIG_ROOT} already exists. Use --force to re-bootstrap.`
+        } as const;
         errors.push({
           file: DEFAULT_CONFIG_ROOT,
-          message: `Target ./${DEFAULT_CONFIG_ROOT} already exists. Use --force to re-bootstrap.`
+          message: stateMessageByPreflight[preflight.state]
         });
         return {
           ok: false,
+          preflightState: preflight.state,
           projectRoot: absoluteRoot,
           selectedAgent,
           uiLocale,
@@ -113,7 +125,7 @@ export class AiConfigInitializer implements ConfigInitializerPort {
 
       warnings.push({
         file: DEFAULT_CONFIG_ROOT,
-        message: `Existing ./${DEFAULT_CONFIG_ROOT} removed in force mode.`
+        message: `Existing ./${DEFAULT_CONFIG_ROOT} removed in force mode (previous state: ${preflight.state}).`
       });
       fs.rmSync(targetDir, { recursive: true, force: true });
     }
@@ -140,6 +152,7 @@ export class AiConfigInitializer implements ConfigInitializerPort {
 
     return {
       ok: manifestOk,
+      preflightState: preflight.state,
       projectRoot: absoluteRoot,
       selectedAgent,
       uiLocale,

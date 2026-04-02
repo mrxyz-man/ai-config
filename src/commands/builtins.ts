@@ -11,6 +11,8 @@ import { CommandDefinition } from "../core/command-registry";
 import { DEFAULT_CONFIG_ROOT } from "../core/config-paths";
 import { EXIT_CODE } from "../core/exit-codes";
 import { UI_LOCALE_OPTIONS, normalizeUiLocale } from "../core/locales";
+import { detectPreflightState } from "../core/preflight";
+import { applySyncPlan, buildSyncPlan, templateExists } from "../core/sync-planner";
 import type { InitIssue } from "../core/ports";
 
 const REQUIRED_ROOT_FILES = [
@@ -127,6 +129,8 @@ const readYamlObject = (
 const validateManifestContent = (manifest: Record<string, unknown>): InitIssue[] => {
   const errors: InitIssue[] = [];
   const schemaVersion = manifest.schema_version;
+  const generator = manifest.generator;
+  const managedBy = manifest.managed_by;
   const selectedAgent = manifest.selected_agent;
   const uiLocale = manifest.ui_locale;
 
@@ -134,6 +138,20 @@ const validateManifestContent = (manifest: Record<string, unknown>): InitIssue[]
     errors.push({
       file: `${DEFAULT_CONFIG_ROOT}/manifest.yaml`,
       message: "Missing or invalid 'schema_version'."
+    });
+  }
+
+  if (generator !== "ai-config") {
+    errors.push({
+      file: `${DEFAULT_CONFIG_ROOT}/manifest.yaml`,
+      message: "Missing or invalid 'generator' (expected 'ai-config')."
+    });
+  }
+
+  if (managedBy !== "ai-config") {
+    errors.push({
+      file: `${DEFAULT_CONFIG_ROOT}/manifest.yaml`,
+      message: "Missing or invalid 'managed_by' (expected 'ai-config')."
     });
   }
 
@@ -505,6 +523,7 @@ export const builtInCommands: CommandDefinition[] = [
               ok: report.ok,
               command: "init",
               data: {
+                preflightState: report.preflightState,
                 projectRoot: report.projectRoot,
                 selectedAgent: report.selectedAgent,
                 uiLocale: report.uiLocale,
@@ -518,6 +537,7 @@ export const builtInCommands: CommandDefinition[] = [
             if (options.format === "human") {
               if (report.ok) {
                 console.log("Init completed.");
+                console.log(`Preflight: ${report.preflightState}`);
                 console.log(`Agent: ${report.selectedAgent}`);
                 console.log(`UI locale: ${report.uiLocale}`);
                 console.log(`Created: ${report.createdFiles.join(", ")}`);
@@ -537,6 +557,142 @@ export const builtInCommands: CommandDefinition[] = [
     }
   },
   {
+    name: "sync",
+    description: "Plan synchronization between ./.ai and ai-template",
+    register: (program: Command) => {
+      program
+        .command("sync")
+        .description("Plan synchronization between ./.ai and ai-template (dry-run)")
+        .option("--cwd <path>", "Project root path", ".")
+        .option("--format <format>", "Output format: human|json", "human")
+        .option("--dry-run", "Preview only mode", true)
+        .option("--no-dry-run", "Apply missing template files/directories")
+        .option("--conflicts-only", "Show only conflict actions and recommendations", false)
+        .action(
+          (options: {
+            cwd: string;
+            format: "human" | "json";
+            dryRun: boolean;
+            conflictsOnly?: boolean;
+          }) => {
+            const projectRoot = path.resolve(options.cwd);
+            const preflight = detectPreflightState(projectRoot);
+            const warnings: InitIssue[] = [];
+            const errors: InitIssue[] = [];
+
+            if (!options.dryRun && options.conflictsOnly) {
+              errors.push({
+                file: DEFAULT_CONFIG_ROOT,
+                message: "--conflicts-only is supported only in dry-run mode."
+              });
+            }
+
+            if (!templateExists()) {
+              errors.push({
+                file: "ai-template",
+                message: "Template directory is missing in the package."
+              });
+            }
+
+            if (preflight.state === "fresh") {
+              errors.push({
+                file: DEFAULT_CONFIG_ROOT,
+                message: `Missing ./${DEFAULT_CONFIG_ROOT} directory. Run init first.`
+              });
+            } else if (preflight.state === "foreign") {
+              errors.push({
+                file: DEFAULT_CONFIG_ROOT,
+                message:
+                `Detected foreign ./${DEFAULT_CONFIG_ROOT} (not managed by ai-config). ` +
+                "Use init --force or migration flow before sync."
+              });
+            } else if (preflight.state === "mixed") {
+              errors.push({
+                file: DEFAULT_CONFIG_ROOT,
+                message:
+                `Detected mixed ./${DEFAULT_CONFIG_ROOT} state (managed + foreign markers). ` +
+                "Resolve conflicts before sync."
+              });
+            }
+
+            const canPlan = errors.length === 0 && preflight.state === "managed";
+            let plan: ReturnType<typeof buildSyncPlan> = {
+              actions: [],
+              recommendations: [],
+              summary: { createDirs: 0, createFiles: 0, updateFiles: 0, conflictFiles: 0, unchanged: 0 }
+            };
+            if (canPlan) {
+              plan = buildSyncPlan(projectRoot);
+            }
+            const visibleActions = options.conflictsOnly
+              ? plan.actions.filter((action) => action.type === "conflict_file")
+              : plan.actions;
+            const visibleRecommendations = options.conflictsOnly
+              ? plan.recommendations.filter((recommendation) =>
+                visibleActions.some((action) => action.path === recommendation.path)
+              )
+              : plan.recommendations;
+            const applyResult =
+            canPlan && !options.dryRun
+              ? applySyncPlan(projectRoot, plan)
+              : { applied: { createDirs: 0, createFiles: 0, updateFiles: 0 }, appliedPaths: [] };
+
+            const ok = errors.length === 0;
+            const envelope = createEnvelope({
+              ok,
+              command: "sync",
+              data: {
+                projectRoot,
+                configRoot: DEFAULT_CONFIG_ROOT,
+                preflightState: preflight.state,
+                dryRun: options.dryRun,
+                conflictsOnly: options.conflictsOnly === true,
+                summary: plan.summary,
+                actions: visibleActions,
+                recommendations: visibleRecommendations,
+                applied: applyResult.applied,
+                appliedPaths: applyResult.appliedPaths
+              },
+              warnings,
+              errors
+            });
+
+            emitEnvelope(envelope, options.format);
+            if (options.format === "human") {
+              if (ok) {
+                console.log(options.dryRun ? "Sync dry-run completed." : "Sync apply completed.");
+                console.log(`Preflight: ${preflight.state}`);
+                if (options.conflictsOnly) {
+                  console.log("View: conflicts only");
+                }
+                console.log(
+                  `Planned: ${plan.summary.createDirs} dirs, ${plan.summary.createFiles} files, ${plan.summary.updateFiles} updates, ${plan.summary.conflictFiles} conflicts, ${plan.summary.unchanged} unchanged`
+                );
+                if (!options.dryRun) {
+                  console.log(
+                    `Applied: ${applyResult.applied.createDirs} dirs, ${applyResult.applied.createFiles} files, ${applyResult.applied.updateFiles} updates`
+                  );
+                }
+                if (visibleRecommendations.length > 0) {
+                  console.log(
+                    `Recommendations: ${visibleRecommendations.length} conflict resolution hints`
+                  );
+                }
+              } else {
+                console.error("Sync failed.");
+                for (const error of errors) {
+                  console.error(`- [ERROR] ${error.file}: ${error.message}`);
+                }
+              }
+            }
+
+            if (!ok) {
+              process.exitCode = EXIT_CODE.ERROR;
+            }
+          });
+    }
+  },
+  {
     name: "validate",
     description: "Validate ./.ai bootstrap structure",
     register: (program: Command) => {
@@ -548,16 +704,31 @@ export const builtInCommands: CommandDefinition[] = [
         .action((options: { cwd: string; format: "human" | "json" }) => {
           const projectRoot = path.resolve(options.cwd);
           const aiRoot = path.join(projectRoot, DEFAULT_CONFIG_ROOT);
+          const preflight = detectPreflightState(projectRoot);
           const manifestPath = path.join(aiRoot, "manifest.yaml");
           const configPath = path.join(aiRoot, "config.yaml");
           const modulesPath = path.join(aiRoot, "modules.yaml");
           const warnings: InitIssue[] = [];
           const errors: InitIssue[] = [];
 
-          if (!fs.existsSync(aiRoot)) {
+          if (preflight.state === "fresh") {
             errors.push({
               file: DEFAULT_CONFIG_ROOT,
               message: `Missing ./${DEFAULT_CONFIG_ROOT} directory. Run init first.`
+            });
+          } else if (preflight.state === "foreign") {
+            errors.push({
+              file: DEFAULT_CONFIG_ROOT,
+              message:
+                `Detected foreign ./${DEFAULT_CONFIG_ROOT} (not managed by ai-config). ` +
+                "Use init --force to re-bootstrap, or migrate/import before validate."
+            });
+          } else if (preflight.state === "mixed") {
+            errors.push({
+              file: DEFAULT_CONFIG_ROOT,
+              message:
+                `Detected mixed ./${DEFAULT_CONFIG_ROOT} state (managed + foreign markers). ` +
+                "Resolve conflicts, then run validate again."
             });
           } else {
             for (const fileName of REQUIRED_ROOT_FILES) {
@@ -615,7 +786,8 @@ export const builtInCommands: CommandDefinition[] = [
             command: "validate",
             data: {
               projectRoot,
-              configRoot: DEFAULT_CONFIG_ROOT
+              configRoot: DEFAULT_CONFIG_ROOT,
+              preflightState: preflight.state
             },
             warnings,
             errors
@@ -625,6 +797,7 @@ export const builtInCommands: CommandDefinition[] = [
           if (options.format === "human") {
             if (ok) {
               console.log("Validation passed.");
+              console.log(`Preflight: ${preflight.state}`);
               console.log(
                 `Checked: ./${DEFAULT_CONFIG_ROOT} root files, manifest/config/modules integrity, enabled module paths, and cross-module links`
               );

@@ -1,0 +1,23 @@
+schema_version: "1"
+
+business_goals:
+  # - id: "goal-1"
+  #   description: "Increase conversion in checkout flow."
+  #   priority: "high" # low | medium | high | critical
+  #   target_metric: "checkout_conversion_rate"
+  #   target_value: ">= 3.5%"
+  #   deadline: "2026-12-31"
+  #   owner: "product"
+
+quality_goals:
+  # - id: "quality-1"
+  #   description: "Reduce production incident rate."
+  #   target_metric: "sev1_incidents_per_month"
+  #   target_value: "<= 1"
+  #   owner: "engineering"
+
+constraints:
+  # - "No downtime during migration."
+  # - "Backward compatibility for public API v1."
+
+notes: "Fill this file with measurable goals. AI-agent should use it for prioritization and trade-offs."

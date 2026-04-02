@@ -21,6 +21,10 @@ Current behavior:
   - enabled module paths existence
   - cross-module checks (`skills.required_modules`, workflow `role`/`fallback_role`)
 
+Init contract:
+- `init` is bootstrap-oriented; `sync` is reserved for managed structure updates.
+- preflight routing design is documented in `INIT-SYNC-CONTRACT.md`.
+
 Quick Start (recommended):
 
 ```bash

@@ -23,3 +23,4 @@ This directory contains canonical templates for standard AI artifacts.
 - `memory-session-template.md`: template for short-term session notes.
 - `memory-open-question-template.md`: template for unresolved question records.
 - `task-template.yaml`: canonical structure for local orchestration task files.
+- `eval-template.md`: template for verification/evaluation summary with evidence and confidence.

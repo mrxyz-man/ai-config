@@ -1,4 +1,5 @@
 import type { AgentKey } from "./agents";
+import type { PreflightState } from "./preflight";
 
 export type InitIssue = {
   file: string;
@@ -7,6 +8,7 @@ export type InitIssue = {
 
 export type InitReport = {
   ok: boolean;
+  preflightState: PreflightState;
   projectRoot: string;
   selectedAgent: AgentKey;
   uiLocale: string;
