@@ -1,0 +1,55 @@
+schema_version: "1"
+id: "task-breakdown"
+title: "Task Breakdown"
+enabled: true
+version: "1.0.0"
+
+purpose: "Transform incoming work into an executable plan with risks and acceptance criteria."
+outcome: "Task is split into actionable steps with explicit completion criteria."
+
+triggers:
+  - "feature"
+  - "bug"
+  - "refactor"
+  - "architecture"
+
+compatible_roles:
+  - "developer"
+  - "architect"
+
+required_modules:
+  - "rules"
+
+inputs:
+  - "task_context"
+  - ".ai/project/requirements.md"
+  - ".ai/project/user-stories.md"
+  - ".ai/rules/*"
+
+outputs:
+  - "task_plan"
+
+output_mode: "structured-update"
+
+steps:
+  - "Classify task complexity (small/medium/epic)."
+  - "Split task into atomic steps."
+  - "Define acceptance criteria per step."
+  - "Identify risks, dependencies, and blockers."
+
+quality_checks:
+  - "Each step is testable and unambiguous."
+  - "Critical risks are visible."
+  - "Plan can be executed incrementally."
+
+constraints:
+  - "Avoid over-fragmentation into meaningless micro-steps."
+  - "Do not proceed with unresolved critical blockers."
+
+handoff_to:
+  - "developer"
+
+handoff_payload:
+  - "task_plan"
+  - "acceptance_criteria"
+  - "risk_register"

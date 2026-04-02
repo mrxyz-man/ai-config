@@ -1,0 +1,55 @@
+schema_version: "1"
+id: "code-generation"
+title: "Code Generation"
+enabled: true
+version: "1.0.0"
+
+purpose: "Implement scoped changes safely and consistently with project rules."
+outcome: "Working code changes with verifiable quality checks."
+
+triggers:
+  - "feature"
+  - "bug"
+  - "refactor"
+
+compatible_roles:
+  - "developer"
+
+required_modules:
+  - "rules"
+
+inputs:
+  - "task_plan"
+  - ".ai/rules/coding-standards.md"
+  - ".ai/rules/architecture.md"
+  - ".ai/.aiignore"
+
+outputs:
+  - "code_changes"
+  - "change_summary"
+
+output_mode: "structured-update"
+
+steps:
+  - "Select minimal file scope required for the task."
+  - "Implement changes atomically."
+  - "Run applicable verification checks."
+  - "Summarize changes, assumptions, and risks."
+
+quality_checks:
+  - "Changes satisfy acceptance criteria."
+  - "No unrelated files are modified."
+  - "Lint/type/test checks pass when applicable."
+
+constraints:
+  - "Do not bypass project safety rules."
+  - "Do not introduce hidden side effects."
+
+handoff_to:
+  - "reviewer"
+
+handoff_payload:
+  - "change_summary"
+  - "changed_files"
+  - "verification_results"
+  - "open_risks"

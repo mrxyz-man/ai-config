@@ -1,0 +1,80 @@
+schema_version: "1"
+id: "context-hydration"
+title: "Context Hydration"
+enabled: true
+version: "1.0.0"
+
+purpose: "Collect the minimum required project context before execution."
+outcome: "Known context gaps are resolved or explicitly documented."
+
+triggers:
+  - "feature"
+  - "bug"
+  - "docs"
+  - "architecture"
+  - "testing"
+  - "init-followup"
+
+compatible_roles:
+  - "developer"
+  - "reviewer"
+  - "architect"
+  - "tester"
+
+required_modules:
+  - "core"
+  - "qa"
+
+preconditions:
+  - ".ai structure exists"
+
+inputs:
+  - ".ai/manifest.yaml"
+  - ".ai/config.yaml"
+  - ".ai/modules.yaml"
+  - ".ai/project/*"
+  - ".ai/rules/*"
+  - ".ai/qa.yaml"
+
+outputs:
+  - ".ai/qa.yaml"
+
+output_mode: "structured-update"
+
+steps:
+  - "Read manifest and detect qa_completed status."
+  - "Identify missing or incomplete context required for current task."
+  - "Ask only targeted questions needed to proceed."
+  - "Update qa.yaml with new answers and status hints."
+
+quality_checks:
+  - "No duplicate questions are generated."
+  - "Only missing context is requested."
+  - "Blockers are explicitly listed if context is still insufficient."
+
+constraints:
+  - "Do not ask broad or unrelated questions."
+  - "Respect configured locale for user-facing questions."
+
+escalation_rules:
+  - "Conflicting answers in existing project context."
+  - "Required context cannot be obtained."
+
+handoff_to:
+  - "developer"
+
+handoff_payload:
+  - "context_summary"
+  - "open_context_gaps"
+
+user_questions_policy:
+  ask_only_missing: true
+  max_questions_per_round: 5
+
+response_style:
+  format: "structured"
+  verbosity: "concise"
+
+telemetry_tags:
+  - "context"
+  - "hydration"

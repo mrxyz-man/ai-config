@@ -1,0 +1,53 @@
+schema_version: "1"
+id: "documentation"
+title: "Documentation"
+enabled: true
+version: "1.0.0"
+
+purpose: "Keep project documentation synchronized with functional and architectural changes."
+outcome: "Relevant docs accurately reflect current behavior and decisions."
+
+triggers:
+  - "feature"
+  - "bug"
+  - "architecture"
+  - "docs"
+
+compatible_roles:
+  - "developer"
+  - "reviewer"
+  - "architect"
+  - "tester"
+
+required_modules:
+  - "templates"
+
+inputs:
+  - "change_summary"
+  - ".ai/project/*"
+  - ".ai/rules/*"
+  - ".ai/templates/*"
+
+outputs:
+  - "updated_docs"
+
+output_mode: "structured-update"
+
+steps:
+  - "Identify docs impacted by current change."
+  - "Update only relevant sections."
+  - "Ensure terminology and examples are consistent."
+
+quality_checks:
+  - "Documentation matches implemented behavior."
+  - "No stale references remain in updated sections."
+
+constraints:
+  - "Avoid broad doc rewrites unrelated to current task."
+
+handoff_to:
+  - "reviewer"
+
+handoff_payload:
+  - "docs_change_summary"
+  - "updated_paths"

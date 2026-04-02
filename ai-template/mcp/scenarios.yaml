@@ -1,0 +1,113 @@
+schema_version: "1"
+
+scenarios:
+  - id: "lookup-current-docs"
+    title: "Lookup Current Documentation"
+    intent: "lookup-docs"
+    task_types: ["docs", "feature", "bug"]
+    required_capabilities: ["docs", "search"]
+    preferred_providers: ["context7"]
+    flow:
+      - "Select enabled provider with docs/search capability."
+      - "Retrieve minimal relevant documentation."
+      - "Summarize actionable parts only."
+    requires_confirmation: false
+    expected_output: "short_actionable_doc_summary"
+    risk_notes:
+      - "Avoid stale docs by preferring current provider data."
+    fallback: "use_policy_chain"
+
+  - id: "prepare-task-from-text"
+    title: "Prepare Task From User Text"
+    intent: "manage-tasks"
+    task_types: ["feature", "bug", "refactor"]
+    required_capabilities: ["issues"]
+    preferred_providers: ["gitlab-mcp-agent-server"]
+    flow:
+      - "Parse user request into structured task."
+      - "If write is requested, ask for explicit confirmation."
+      - "Create/update task in external system or local fallback."
+    requires_confirmation: true
+    expected_output: "task_spec_and_status"
+    risk_notes:
+      - "Do not mutate external tracker without confirmation."
+    fallback: "use_policy_chain"
+
+  - id: "search-code-context"
+    title: "Search Code Context"
+    intent: "search-repo"
+    task_types: ["feature", "bug", "review"]
+    required_capabilities: ["repo_read", "search"]
+    preferred_providers: ["gitlab-mcp-agent-server"]
+    flow:
+      - "Search relevant symbols/files."
+      - "Select minimal context set."
+      - "Return findings with file references."
+    requires_confirmation: false
+    expected_output: "relevant_code_context_bundle"
+    risk_notes:
+      - "Avoid over-fetching unrelated repository data."
+    fallback: "use_policy_chain"
+
+  - id: "debug-frontend-with-browser"
+    title: "Debug Frontend via Browser"
+    intent: "debug-ui"
+    task_types: ["frontend", "bug", "feature"]
+    required_capabilities: ["browser_inspect", "web_debug"]
+    preferred_providers: ["chrome-devtools"]
+    flow:
+      - "Open target page and inspect runtime state."
+      - "Capture network/console/performance evidence."
+      - "Summarize root cause and remediation options."
+    requires_confirmation: true
+    expected_output: "debug_evidence_and_fix_recommendation"
+    risk_notes:
+      - "Mutating browser actions require explicit user confirmation."
+    fallback: "use_policy_chain"
+
+  - id: "sequential-solution-planning"
+    title: "Sequential Solution Planning"
+    intent: "plan-solution"
+    task_types: ["architecture", "feature", "refactor"]
+    required_capabilities: ["reasoning", "planning"]
+    preferred_providers: ["sequential-thinking"]
+    flow:
+      - "Break down the problem into explicit reasoning steps."
+      - "Evaluate alternatives and trade-offs."
+      - "Produce a clear execution plan."
+    requires_confirmation: false
+    expected_output: "stepwise_plan_with_tradeoffs"
+    risk_notes:
+      - "Avoid overengineering; keep plans proportionate to scope."
+    fallback: "use_policy_chain"
+
+  - id: "memory-context-recall"
+    title: "Recall Long-Term Context"
+    intent: "recall-context"
+    task_types: ["feature", "bug", "docs", "architecture"]
+    required_capabilities: ["memory_read", "knowledge_graph"]
+    preferred_providers: ["memory-knowledge-graph"]
+    flow:
+      - "Retrieve relevant historical decisions and context."
+      - "Cross-check memory with current project state."
+      - "Use validated memory to reduce repeated questions."
+    requires_confirmation: false
+    expected_output: "context_recall_summary"
+    risk_notes:
+      - "Treat memory as supportive context, not source of truth."
+    fallback: "use_policy_chain"
+
+  - id: "mcp-unavailable-fallback"
+    title: "MCP Unavailable Fallback"
+    intent: "fallback"
+    task_types: ["feature", "bug", "docs", "architecture", "testing"]
+    required_capabilities: []
+    flow:
+      - "Use local .ai and repository context."
+      - "Ask targeted user questions for missing data."
+      - "Proceed with bounded assumptions and explicit risk notes."
+    requires_confirmation: false
+    expected_output: "local_context_decision_summary"
+    risk_notes:
+      - "State confidence and assumptions explicitly."
+    fallback: "custom_steps"

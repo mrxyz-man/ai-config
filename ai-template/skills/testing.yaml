@@ -1,0 +1,58 @@
+schema_version: "1"
+id: "testing"
+title: "Testing"
+enabled: true
+version: "1.0.0"
+
+purpose: "Validate changes through risk-oriented testing and regression checks."
+outcome: "Clear confidence statement with covered scenarios and known test gaps."
+
+triggers:
+  - "feature"
+  - "bug"
+  - "refactor"
+  - "api-change"
+
+compatible_roles:
+  - "tester"
+  - "developer"
+  - "reviewer"
+
+required_modules:
+  - "rules"
+
+inputs:
+  - "task_plan"
+  - "changed_files"
+  - ".ai/rules/testing.md"
+  - ".ai/rules/review.md"
+
+outputs:
+  - "test_plan"
+  - "test_report"
+  - "test_gaps"
+
+output_mode: "structured-update"
+
+steps:
+  - "Prioritize critical user and business flows."
+  - "Validate happy, negative, and edge paths."
+  - "Record pass/fail status and unresolved risks."
+
+quality_checks:
+  - "Critical paths are verified."
+  - "Results are reproducible."
+  - "Gaps are explicit."
+
+constraints:
+  - "Do not claim pass if critical scope is untested."
+  - "Avoid brittle tests tied to implementation details."
+
+handoff_to:
+  - "reviewer"
+  - "developer"
+
+handoff_payload:
+  - "test_report"
+  - "defect_list"
+  - "remaining_risks"

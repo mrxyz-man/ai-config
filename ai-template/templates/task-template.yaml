@@ -1,0 +1,31 @@
+schema_version: "1"
+
+id: "TASK-YYYYMMDD-001"
+title: "Task title"
+type: "feature" # feature | bug | refactor | docs | architecture | release
+status: "pending" # pending | in_progress | blocked | review | completed | cancelled
+priority: "medium" # low | medium | high | critical
+
+description: "Short problem statement and intended outcome."
+
+assignee_role: "developer"
+workflow_id: "feature-dev"
+
+acceptance_criteria:
+  - "Criterion 1"
+  - "Criterion 2"
+
+risks:
+  - "Risk 1"
+
+open_questions:
+  - "Question 1"
+
+qa_dependencies:
+  - "Q-YYYYMMDD-001"
+
+artifacts:
+  - "/path/to/file"
+
+created_at: "2026-04-02T00:00:00Z"
+updated_at: "2026-04-02T00:00:00Z"

@@ -1,0 +1,18 @@
+# Fill runtime/framework/database/testing/tooling used in this project.
+# Example structure:
+#
+# runtime:
+#   name: ""
+#   version: ""
+# framework:
+#   name: ""
+#   version: ""
+# database:
+#   name: ""
+#   version: ""
+# testing:
+#   name: ""
+#   version: ""
+# package_manager:
+#   name: ""
+#   version: ""

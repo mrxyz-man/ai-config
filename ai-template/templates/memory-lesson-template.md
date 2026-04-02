@@ -1,0 +1,17 @@
+### ID: LES-YYYYMMDD-001
+- Date: 2026-04-01
+- Topic: Short topic name
+- Symptom:
+  - What problem was observed.
+- Root cause:
+  - Why it happened.
+- Resolution:
+  - What fixed it.
+- Prevention rule:
+  - How to avoid this in future.
+- Applies to:
+  - modules/components/scenarios
+- Source refs:
+  - /path/to/file
+  - issue/task/pr reference
+- Confidence: low | medium | high

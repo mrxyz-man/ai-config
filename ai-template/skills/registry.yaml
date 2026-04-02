@@ -1,0 +1,99 @@
+schema_version: "1"
+
+defaults:
+  auto_apply: true
+  fallback_skill: "context-hydration"
+  default_enabled_skills:
+    - "context-hydration"
+    - "task-breakdown"
+    - "code-generation"
+    - "testing"
+    - "documentation"
+
+skills:
+  - id: "context-hydration"
+    file: "context-hydration.yaml"
+    enabled: true
+    priority: 100
+    tags: ["context", "planning"]
+    compatible_roles: ["developer", "reviewer", "architect", "tester"]
+    required_modules: ["core", "qa"]
+    mode: "hybrid"
+
+  - id: "task-breakdown"
+    file: "task-breakdown.yaml"
+    enabled: true
+    priority: 90
+    tags: ["planning", "delivery"]
+    compatible_roles: ["developer", "architect"]
+    required_modules: ["rules"]
+    mode: "hybrid"
+
+  - id: "code-generation"
+    file: "code-generation.yaml"
+    enabled: true
+    priority: 80
+    tags: ["implementation", "code"]
+    compatible_roles: ["developer"]
+    required_modules: ["rules"]
+    mode: "hybrid"
+
+  - id: "testing"
+    file: "testing.yaml"
+    enabled: true
+    priority: 70
+    tags: ["quality", "verification"]
+    compatible_roles: ["tester", "developer", "reviewer"]
+    required_modules: ["rules"]
+    mode: "hybrid"
+
+  - id: "documentation"
+    file: "documentation.yaml"
+    enabled: true
+    priority: 60
+    tags: ["docs", "knowledge"]
+    compatible_roles: ["developer", "reviewer", "architect", "tester"]
+    required_modules: ["templates"]
+    mode: "hybrid"
+
+routing_rules:
+  - when:
+      task_type: "feature"
+      role: "developer"
+    apply_skills:
+      - "context-hydration"
+      - "task-breakdown"
+      - "code-generation"
+      - "testing"
+      - "documentation"
+    order: "sequential"
+
+  - when:
+      task_type: "bug"
+      role: "developer"
+    apply_skills:
+      - "context-hydration"
+      - "task-breakdown"
+      - "code-generation"
+      - "testing"
+    order: "sequential"
+
+  - when:
+      task_type: "architecture"
+      role: "architect"
+    apply_skills:
+      - "context-hydration"
+      - "task-breakdown"
+      - "documentation"
+    order: "sequential"
+
+  - when:
+      task_type: "docs"
+    apply_skills:
+      - "context-hydration"
+      - "documentation"
+    order: "sequential"
+
+conflicts:
+  exclusive_groups: []
+  precedence: "priority"

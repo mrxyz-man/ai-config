@@ -1,33 +1,9 @@
 import { Command } from "commander";
 
-import {
-  AuditLoggerPort,
-  ConfigInitializerPort,
-  TaskBoardPort,
-  TextPolicyPort,
-  QuestionsPort,
-  TaskMcpIntegrationPort,
-  ConfigSyncPort,
-  ConfigExplainerPort,
-  ConfigResolverPort,
-  ConfigValidatorPort,
-  PolicyGatePort
-} from "./ports";
-import { ModuleRegistry } from "./module-registry";
+import { ConfigInitializerPort } from "./ports";
 
 export type CommandContext = {
   initializer: ConfigInitializerPort;
-  syncer: ConfigSyncPort;
-  explainer: ConfigExplainerPort;
-  mcpIntegration: TaskMcpIntegrationPort;
-  taskBoard: TaskBoardPort;
-  textPolicy: TextPolicyPort;
-  questions: QuestionsPort;
-  validator: ConfigValidatorPort;
-  resolver: ConfigResolverPort;
-  policyGate: PolicyGatePort;
-  auditLogger: AuditLoggerPort;
-  moduleRegistry: ModuleRegistry;
 };
 
 export type CommandDefinition = {
@@ -52,13 +28,10 @@ export class CommandRegistry {
     }
   }
 
-  list(): CommandDefinition[] {
-    return [...this.commands.values()];
-  }
-
   apply(program: Command, context: CommandContext): void {
     for (const command of this.commands.values()) {
       command.register(program, context);
     }
   }
 }
+

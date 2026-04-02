@@ -1,0 +1,76 @@
+schema_version: "1"
+
+defaults:
+  default_role: "developer"
+  fallback_role: "developer"
+  auto_handoff: true
+
+workflow:
+  handoff_order:
+    - "developer"
+    - "reviewer"
+    - "developer"
+  stop_on_review_fail: true
+  max_handoffs: 3
+
+quality_gates:
+  - "lint_passed"
+  - "typecheck_passed"
+  - "review_completed"
+
+roles:
+  - id: "developer"
+    file: "developer.yaml"
+    enabled: true
+    can_start_task: true
+    can_finish_task: false
+    priority: 100
+    tags:
+      - "implementation"
+      - "code"
+
+  - id: "reviewer"
+    file: "reviewer.yaml"
+    enabled: true
+    can_start_task: false
+    can_finish_task: true
+    priority: 90
+    tags:
+      - "review"
+      - "risk"
+
+  - id: "architect"
+    file: "architect.yaml"
+    enabled: false
+    can_start_task: true
+    can_finish_task: false
+    priority: 80
+    tags:
+      - "architecture"
+      - "design"
+
+  - id: "tester"
+    file: "tester.yaml"
+    enabled: false
+    can_start_task: false
+    can_finish_task: false
+    priority: 80
+    tags:
+      - "testing"
+      - "quality"
+
+routing_rules:
+  - task_type: "feature"
+    start_role: "developer"
+    mandatory_roles:
+      - "reviewer"
+
+  - task_type: "bug"
+    start_role: "developer"
+    mandatory_roles:
+      - "reviewer"
+
+  - task_type: "architecture"
+    start_role: "architect"
+    mandatory_roles:
+      - "reviewer"
