@@ -119,6 +119,44 @@ Expected:
 - missing `--agent` error
 - process exit code `2`
 
+## Case 7: Extended Non-Interactive Init Persists Config
+1. Run:
+```bash
+node <repo-root>/dist/cli.js init --cwd <case-path> --non-interactive --agent codex --ui-locale en --profile standard --modules core,qa,project,rules,agents,skills,templates,mcp --task-mode assisted --questionnaire-on-init true --enable-mcp-providers context7,chrome-devtools --format json
+```
+Expected:
+- `ok: true`
+- output includes `profile/modules/taskMode/questionnaireOnInit/enableMcpProviders`
+2. Verify files:
+- `.ai/config.yaml`:
+  - `profile.name: standard`
+  - `behavior.task_mode: assisted`
+  - `behavior.questionnaire_on_init: true`
+- `.ai/modules.yaml`: selected modules are enabled.
+- `.ai/qa.yaml`: `status: in_progress`
+- `.ai/mcp/registry.yaml`:
+  - `context7.enabled: true`
+  - `chrome-devtools.enabled: true`
+  - non-selected providers remain disabled.
+
+## Case 8: Dependency Errors in Non-Interactive Mode
+1. Run invalid modules combo:
+```bash
+node <repo-root>/dist/cli.js init --cwd <case-path> --non-interactive --agent codex --ui-locale en --modules core,qa,skills --format json
+```
+Expected:
+- `ok: false`
+- usage error (`exit code 2`)
+- message references dependency requirement.
+2. Run invalid MCP provider usage:
+```bash
+node <repo-root>/dist/cli.js init --cwd <case-path> --non-interactive --agent codex --ui-locale en --modules core,qa --enable-mcp-providers context7 --format json
+```
+Expected:
+- `ok: false`
+- usage error (`exit code 2`)
+- message indicates MCP providers require `mcp` module.
+
 ## Optional: Real Project Root Smoke
 Run on real target path directly:
 ```bash

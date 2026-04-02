@@ -353,4 +353,130 @@ describe("CLI smoke flows", () => {
     expect(syncResult.stdout).toContain("\"ok\": false");
     expect(syncResult.stdout).toContain("--conflicts-only is supported only in dry-run mode");
   });
+
+  test("init accepts extended non-interactive options", () => {
+    const projectPath = createTempProject();
+    const result = runCli([
+      "init",
+      "--cwd",
+      projectPath,
+      "--non-interactive",
+      "--agent",
+      "codex",
+      "--ui-locale",
+      "en",
+      "--profile",
+      "standard",
+      "--modules",
+      "core,qa,project,rules,agents,skills,templates,mcp",
+      "--task-mode",
+      "assisted",
+      "--questionnaire-on-init",
+      "true",
+      "--enable-mcp-providers",
+      "context7,chrome-devtools",
+      "--format",
+      "json"
+    ]);
+
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("\"ok\": true");
+    expect(result.stdout).toContain("\"profile\": \"standard\"");
+    expect(result.stdout).toContain("\"modules\": [");
+    expect(result.stdout).toContain("\"taskMode\": \"assisted\"");
+    expect(result.stdout).toContain("\"questionnaireOnInit\": true");
+    expect(result.stdout).toContain("\"enableMcpProviders\": [");
+    expect(result.stdout).toContain("\"context7\"");
+
+    const configRaw = fs.readFileSync(path.join(projectPath, ".ai", "config.yaml"), "utf8");
+    const config = parseYaml(configRaw) as Record<string, unknown>;
+    const profile = config.profile as Record<string, unknown>;
+    const behavior = config.behavior as Record<string, unknown>;
+    expect(profile.name).toBe("standard");
+    expect(behavior.task_mode).toBe("assisted");
+    expect(behavior.questionnaire_on_init).toBe(true);
+
+    const modulesRaw = fs.readFileSync(path.join(projectPath, ".ai", "modules.yaml"), "utf8");
+    const modulesConfig = parseYaml(modulesRaw) as Record<string, unknown>;
+    const modules = modulesConfig.modules as Array<Record<string, unknown>>;
+    const getModuleEnabled = (name: string): boolean =>
+      modules.find((moduleDef) => moduleDef.name === name)?.enabled === true;
+    expect(getModuleEnabled("mcp")).toBe(true);
+    expect(getModuleEnabled("skills")).toBe(true);
+
+    const qaRaw = fs.readFileSync(path.join(projectPath, ".ai", "qa.yaml"), "utf8");
+    const qa = parseYaml(qaRaw) as Record<string, unknown>;
+    expect(qa.status).toBe("in_progress");
+
+    const mcpRegistryRaw = fs.readFileSync(
+      path.join(projectPath, ".ai", "mcp", "registry.yaml"),
+      "utf8"
+    );
+    const mcpRegistry = parseYaml(mcpRegistryRaw) as Record<string, unknown>;
+    const providers = mcpRegistry.providers as Array<Record<string, unknown>>;
+    const getProviderEnabled = (id: string): boolean =>
+      providers.find((providerDef) => providerDef.id === id)?.enabled === true;
+    expect(getProviderEnabled("context7")).toBe(true);
+    expect(getProviderEnabled("chrome-devtools")).toBe(true);
+    expect(getProviderEnabled("gitlab-mcp-agent-server")).toBe(false);
+
+    const orchestrationRaw = fs.readFileSync(
+      path.join(projectPath, ".ai", "orchestration", "orchestration.yaml"),
+      "utf8"
+    );
+    const orchestration = parseYaml(orchestrationRaw) as Record<string, unknown>;
+    expect(orchestration.enabled).toBe(false);
+
+    const memoryRaw = fs.readFileSync(path.join(projectPath, ".ai", "memory", "profile.yaml"), "utf8");
+    const memory = parseYaml(memoryRaw) as Record<string, unknown>;
+    expect(memory.enabled).toBe(false);
+
+    const logsRaw = fs.readFileSync(path.join(projectPath, ".ai", "logs", "policy.yaml"), "utf8");
+    const logs = parseYaml(logsRaw) as Record<string, unknown>;
+    expect(logs.enabled).toBe(false);
+  });
+
+  test("init fails with usage error on invalid profile in non-interactive mode", () => {
+    const projectPath = createTempProject();
+    const result = runCli([
+      "init",
+      "--cwd",
+      projectPath,
+      "--non-interactive",
+      "--agent",
+      "codex",
+      "--ui-locale",
+      "en",
+      "--profile",
+      "enterprise",
+      "--format",
+      "json"
+    ]);
+
+    expect(result.status).toBe(2);
+    expect(result.stdout).toContain("\"ok\": false");
+    expect(result.stdout).toContain("Invalid --profile value");
+  });
+
+  test("init fails with dependency error when skills enabled without required modules", () => {
+    const projectPath = createTempProject();
+    const result = runCli([
+      "init",
+      "--cwd",
+      projectPath,
+      "--non-interactive",
+      "--agent",
+      "codex",
+      "--ui-locale",
+      "en",
+      "--modules",
+      "core,qa,skills",
+      "--format",
+      "json"
+    ]);
+
+    expect(result.status).toBe(2);
+    expect(result.stdout).toContain("\"ok\": false");
+    expect(result.stdout).toContain("requires");
+  });
 });

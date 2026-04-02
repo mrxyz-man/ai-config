@@ -1,4 +1,5 @@
 import type { AgentKey } from "./agents";
+import type { InitModuleName, InitProfile, McpProviderId, TaskMode } from "./init-config";
 import type { PreflightState } from "./preflight";
 
 export type InitIssue = {
@@ -17,9 +18,17 @@ export type InitReport = {
   errors: InitIssue[];
 };
 
+export type InitOptions = {
+  force?: boolean;
+  agent?: AgentKey;
+  uiLocale?: string;
+  profile?: InitProfile;
+  modules?: InitModuleName[];
+  taskMode?: TaskMode;
+  questionnaireOnInit?: boolean;
+  enableMcpProviders?: McpProviderId[];
+};
+
 export interface ConfigInitializerPort {
-  init(
-    projectRoot: string,
-    options?: { force?: boolean; agent?: AgentKey; uiLocale?: string }
-  ): InitReport;
+  init(projectRoot: string, options?: InitOptions): InitReport;
 }

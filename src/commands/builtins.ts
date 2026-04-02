@@ -10,6 +10,19 @@ import { AGENT_MENU_OPTIONS, normalizeAgentKey, type AgentKey } from "../core/ag
 import { CommandDefinition } from "../core/command-registry";
 import { DEFAULT_CONFIG_ROOT } from "../core/config-paths";
 import { EXIT_CODE } from "../core/exit-codes";
+import {
+  INIT_MODULES,
+  INIT_PROFILES,
+  MCP_PROVIDER_IDS,
+  PROFILE_TO_MODULES,
+  PROVIDER_PRESETS,
+  resolveInitConfig,
+  TASK_MODES,
+  type InitModuleName,
+  type InitProfile,
+  type McpProviderId,
+  type TaskMode
+} from "../core/init-config";
 import { UI_LOCALE_OPTIONS, normalizeUiLocale } from "../core/locales";
 import { detectPreflightState } from "../core/preflight";
 import { applySyncPlan, buildSyncPlan, templateExists } from "../core/sync-planner";
@@ -25,6 +38,26 @@ const REQUIRED_ROOT_FILES = [
 ] as const;
 
 const asConfigFilePath = (fileName: string): string => `${DEFAULT_CONFIG_ROOT}/${fileName}`;
+
+const splitCommaSeparated = (value: string | undefined): string[] =>
+  (value ?? "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+
+const parseBooleanOption = (value: string | undefined): boolean | null => {
+  if (typeof value !== "string") {
+    return null;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true") {
+    return true;
+  }
+  if (normalized === "false") {
+    return false;
+  }
+  return null;
+};
 
 const selectAgentInteractive = async (): Promise<AgentKey | null> => {
   if (!input.isTTY || !output.isTTY) {
@@ -85,6 +118,304 @@ const selectLocaleInteractive = async (): Promise<string | null> => {
   }
 
   return customLocale.trim();
+};
+
+const selectProfileInteractive = async (): Promise<InitProfile | null> => {
+  if (!input.isTTY || !output.isTTY) {
+    return null;
+  }
+
+  const { isCancel, outro, select } = await import("@clack/prompts");
+  const answer = await select({
+    message: "Select bootstrap profile",
+    options: [
+      { value: "minimal", label: "Minimal", hint: "core + qa" },
+      {
+        value: "standard",
+        label: "Standard",
+        hint: "recommended: project/rules/agents/skills/templates"
+      },
+      { value: "full", label: "Full", hint: "all modules enabled" }
+    ]
+  });
+
+  if (isCancel(answer)) {
+    outro("Operation cancelled.");
+    return null;
+  }
+
+  return answer as InitProfile;
+};
+
+const selectModulesInteractive = async (profile: InitProfile): Promise<InitModuleName[] | null> => {
+  if (!input.isTTY || !output.isTTY) {
+    return null;
+  }
+
+  const { isCancel, multiselect, outro } = await import("@clack/prompts");
+  const selectedByProfile = new Set<InitModuleName>(PROFILE_TO_MODULES[profile]);
+  const answer = await multiselect({
+    message: "Select enabled modules",
+    required: true,
+    options: INIT_MODULES.map((moduleName) => ({
+      value: moduleName,
+      label: moduleName,
+      hint: selectedByProfile.has(moduleName) ? "profile default" : undefined
+    })),
+    initialValues: Array.from(selectedByProfile)
+  });
+
+  if (isCancel(answer)) {
+    outro("Operation cancelled.");
+    return null;
+  }
+
+  const selected = Array.isArray(answer) ? answer : [];
+  return INIT_MODULES.filter((moduleName) =>
+    selected.includes(moduleName)
+  ) as unknown as InitModuleName[];
+};
+
+const selectTaskModeInteractive = async (): Promise<TaskMode | null> => {
+  if (!input.isTTY || !output.isTTY) {
+    return null;
+  }
+
+  const { isCancel, outro, select } = await import("@clack/prompts");
+  const answer = await select({
+    message: "Select task mode",
+    options: [
+      { value: "off", label: "off", hint: "no task flow enforcement" },
+      { value: "assisted", label: "assisted", hint: "recommended default" },
+      { value: "enforced", label: "enforced", hint: "strict task process" }
+    ]
+  });
+
+  if (isCancel(answer)) {
+    outro("Operation cancelled.");
+    return null;
+  }
+
+  return answer as TaskMode;
+};
+
+const selectQuestionnaireOnInitInteractive = async (): Promise<boolean | null> => {
+  if (!input.isTTY || !output.isTTY) {
+    return null;
+  }
+
+  const { confirm, isCancel, outro } = await import("@clack/prompts");
+  const answer = await confirm({
+    message: "Enable questionnaire on init?",
+    initialValue: true
+  });
+
+  if (isCancel(answer)) {
+    outro("Operation cancelled.");
+    return null;
+  }
+
+  return Boolean(answer);
+};
+
+const selectMcpProvidersInteractive = async (
+  profile: InitProfile
+): Promise<McpProviderId[] | null> => {
+  if (!input.isTTY || !output.isTTY) {
+    return null;
+  }
+
+  const { isCancel, multiselect, outro } = await import("@clack/prompts");
+  const preset = new Set(PROVIDER_PRESETS[profile]);
+  const answer = await multiselect({
+    message: "Select MCP providers to enable (optional)",
+    required: false,
+    options: MCP_PROVIDER_IDS.map((providerId) => ({
+      value: providerId,
+      label: providerId,
+      hint: preset.has(providerId) ? "profile preset" : undefined
+    })),
+    initialValues: Array.from(preset)
+  });
+
+  if (isCancel(answer)) {
+    outro("Operation cancelled.");
+    return null;
+  }
+
+  const selected = Array.isArray(answer) ? answer : [];
+  return MCP_PROVIDER_IDS.filter((providerId) =>
+    selected.includes(providerId)
+  ) as unknown as McpProviderId[];
+};
+
+const confirmInitConfigurationInteractive = async (params: {
+  selectedAgent: AgentKey;
+  uiLocale: string;
+  profile: InitProfile;
+  modules: InitModuleName[];
+  taskMode: TaskMode;
+  questionnaireOnInit: boolean;
+  enableMcpProviders: McpProviderId[];
+}): Promise<boolean | null> => {
+  if (!input.isTTY || !output.isTTY) {
+    return null;
+  }
+
+  const { confirm, isCancel, outro } = await import("@clack/prompts");
+  console.log("Init configuration summary:");
+  console.log(`- Agent: ${params.selectedAgent}`);
+  console.log(`- UI locale: ${params.uiLocale}`);
+  console.log(`- Profile: ${params.profile}`);
+  console.log(`- Modules: ${params.modules.join(", ")}`);
+  console.log(`- Task mode: ${params.taskMode}`);
+  console.log(`- Questionnaire on init: ${params.questionnaireOnInit}`);
+  console.log(
+    `- MCP providers: ${params.enableMcpProviders.length > 0 ? params.enableMcpProviders.join(", ") : "(none)"}`
+  );
+  const answer = await confirm({
+    message: "Apply this init configuration?",
+    initialValue: true
+  });
+
+  if (isCancel(answer)) {
+    outro("Operation cancelled.");
+    return null;
+  }
+
+  return Boolean(answer);
+};
+
+const parseNonInteractiveInitOptions = (options: {
+  agent?: string;
+  uiLocale?: string;
+  profile?: string;
+  modules?: string;
+  taskMode?: string;
+  questionnaireOnInit?: string;
+  enableMcpProviders?: string;
+}): {
+  selectedAgent: AgentKey | null;
+  uiLocale: string | null;
+  profile: InitProfile | null;
+  modules: InitModuleName[];
+  taskMode: TaskMode | null;
+  questionnaireOnInit: boolean | null;
+  enableMcpProviders: McpProviderId[];
+  warnings: Array<{ message: string }>;
+  errors: Array<{ message: string }>;
+} => {
+  const selectedAgent = normalizeAgentKey(options.agent);
+  const uiLocale = normalizeUiLocale(options.uiLocale);
+  const knownProfiles = new Set<string>(INIT_PROFILES);
+  const knownModules = new Set<string>(INIT_MODULES);
+  const knownTaskModes = new Set<string>(TASK_MODES);
+  const knownProviders = new Set<string>(MCP_PROVIDER_IDS);
+
+  const profileRaw = options.profile?.trim().toLowerCase();
+  const profile =
+    profileRaw && knownProfiles.has(profileRaw) ? (profileRaw as InitProfile) : "standard";
+
+  const modulesRaw = splitCommaSeparated(options.modules).map((item) => item.toLowerCase());
+  const modules = modulesRaw.filter((item): item is InitModuleName => knownModules.has(item));
+
+  const taskModeRaw = options.taskMode?.trim().toLowerCase();
+  const taskMode =
+    taskModeRaw && knownTaskModes.has(taskModeRaw) ? (taskModeRaw as TaskMode) : null;
+
+  const questionnaireOnInit = parseBooleanOption(options.questionnaireOnInit);
+
+  const providersRaw = splitCommaSeparated(options.enableMcpProviders).map((item) =>
+    item.toLowerCase()
+  );
+  const enableMcpProviders = providersRaw.filter(
+    (item): item is McpProviderId => knownProviders.has(item)
+  );
+
+  const errors: Array<{ message: string }> = [];
+  const warnings: Array<{ message: string }> = [];
+  if (!options.agent) {
+    errors.push({ message: "Missing required option --agent in --non-interactive mode." });
+  } else if (!selectedAgent) {
+    errors.push({
+      message: `Invalid --agent value "${options.agent}". Use codex|claude|both|other.`
+    });
+  }
+
+  if (!options.uiLocale) {
+    errors.push({
+      message: "Missing required option --ui-locale in --non-interactive mode."
+    });
+  } else if (!uiLocale) {
+    errors.push({
+      message: `Invalid --ui-locale value "${options.uiLocale}". Use locale like en, ru or pt-BR.`
+    });
+  }
+
+  if (options.profile && (!profileRaw || !knownProfiles.has(profileRaw))) {
+    errors.push({
+      message: `Invalid --profile value "${options.profile}". Use minimal|standard|full.`
+    });
+  }
+
+  if (modulesRaw.length > 0 && modulesRaw.length !== modules.length) {
+    const invalidModules = modulesRaw.filter((moduleName) => !knownModules.has(moduleName));
+    errors.push({
+      message: `Invalid --modules value "${invalidModules.join(",")}". Use known module names from: ${INIT_MODULES.join("|")}.`
+    });
+  }
+
+  if (options.taskMode && !taskMode) {
+    errors.push({
+      message: `Invalid --task-mode value "${options.taskMode}". Use off|assisted|enforced.`
+    });
+  }
+
+  if (options.questionnaireOnInit && questionnaireOnInit === null) {
+    errors.push({
+      message: `Invalid --questionnaire-on-init value "${options.questionnaireOnInit}". Use true|false.`
+    });
+  }
+
+  if (providersRaw.length > 0 && providersRaw.length !== enableMcpProviders.length) {
+    const invalidProviders = providersRaw.filter((providerId) => !knownProviders.has(providerId));
+    errors.push({
+      message: `Invalid --enable-mcp-providers value "${invalidProviders.join(",")}". Use known provider IDs from: ${MCP_PROVIDER_IDS.join("|")}.`
+    });
+  }
+
+  const resolved = resolveInitConfig(
+    {
+      profile,
+      modules: options.modules ? modules : undefined,
+      taskMode: taskMode ?? undefined,
+      questionnaireOnInit: questionnaireOnInit ?? undefined,
+      enableMcpProviders
+    },
+    {
+      autoFixDependencies: false
+    }
+  );
+  for (const resolverError of resolved.errors) {
+    errors.push({ message: `Invalid configuration: ${resolverError}` });
+  }
+  if (resolved.autoAddedModules.length > 0) {
+    warnings.push({
+      message: `Auto-enabled dependent modules: ${resolved.autoAddedModules.join(", ")}.`
+    });
+  }
+
+  return {
+    selectedAgent,
+    uiLocale,
+    profile: resolved.profile,
+    modules: resolved.modules,
+    taskMode: resolved.taskMode,
+    questionnaireOnInit: resolved.questionnaireOnInit,
+    enableMcpProviders: resolved.enableMcpProviders,
+    warnings,
+    errors
+  };
 };
 
 const readYamlObject = (
@@ -426,6 +757,20 @@ export const builtInCommands: CommandDefinition[] = [
         .option("--non-interactive", "Disable prompts and require flags", false)
         .option("--agent <agent>", "Agent key for non-interactive mode: codex|claude|both|other")
         .option("--ui-locale <locale>", "UI locale for non-interactive mode, e.g. en|ru|pt-BR")
+        .option("--profile <profile>", "Init profile: minimal|standard|full", "standard")
+        .option(
+          "--modules <modules>",
+          "Optional CSV override for enabled modules, e.g. core,qa,project,rules"
+        )
+        .option("--task-mode <taskMode>", "Task mode override: off|assisted|enforced")
+        .option(
+          "--questionnaire-on-init <boolean>",
+          "Questionnaire toggle override in non-interactive mode: true|false"
+        )
+        .option(
+          "--enable-mcp-providers <providers>",
+          "Optional CSV list of MCP providers to enable, e.g. context7,chrome-devtools"
+        )
         .action(
           async (options: {
             cwd: string;
@@ -434,32 +779,34 @@ export const builtInCommands: CommandDefinition[] = [
             nonInteractive?: boolean;
             agent?: string;
             uiLocale?: string;
+            profile?: string;
+            modules?: string;
+            taskMode?: string;
+            questionnaireOnInit?: string;
+            enableMcpProviders?: string;
           }) => {
             const targetDir = path.resolve(options.cwd);
             let selectedAgent: AgentKey | null = null;
             let uiLocale: string | null = null;
+            let profile: InitProfile = "standard";
+            let modules: InitModuleName[] = [];
+            let taskMode: TaskMode | null = null;
+            let questionnaireOnInit: boolean | null = null;
+            let enableMcpProviders: McpProviderId[] = [];
+            const initWarnings: Array<{ message: string }> = [];
 
             if (options.nonInteractive) {
-              selectedAgent = normalizeAgentKey(options.agent);
-              uiLocale = normalizeUiLocale(options.uiLocale);
+              const parsedOptions = parseNonInteractiveInitOptions(options);
+              selectedAgent = parsedOptions.selectedAgent;
+              uiLocale = parsedOptions.uiLocale;
+              profile = parsedOptions.profile ?? "standard";
+              modules = parsedOptions.modules;
+              taskMode = parsedOptions.taskMode;
+              questionnaireOnInit = parsedOptions.questionnaireOnInit;
+              enableMcpProviders = parsedOptions.enableMcpProviders;
+              initWarnings.push(...parsedOptions.warnings);
 
-              const errors: Array<{ message: string }> = [];
-              if (!options.agent) {
-                errors.push({ message: "Missing required option --agent in --non-interactive mode." });
-              } else if (!selectedAgent) {
-                errors.push({
-                  message: `Invalid --agent value "${options.agent}". Use codex|claude|both|other.`
-                });
-              }
-              if (!options.uiLocale) {
-                errors.push({
-                  message: "Missing required option --ui-locale in --non-interactive mode."
-                });
-              } else if (!uiLocale) {
-                errors.push({
-                  message: `Invalid --ui-locale value "${options.uiLocale}". Use locale like en, ru or pt-BR.`
-                });
-              }
+              const errors = parsedOptions.errors;
 
               if (errors.length > 0) {
                 const envelope = createEnvelope({
@@ -512,12 +859,205 @@ export const builtInCommands: CommandDefinition[] = [
                 process.exitCode = EXIT_CODE.USAGE;
                 return;
               }
+
+              const selectedProfile = await selectProfileInteractive();
+              if (!selectedProfile) {
+                const envelope = createEnvelope({
+                  ok: false,
+                  command: "init",
+                  data: {},
+                  warnings: [],
+                  errors: [{ message: "Profile selection was cancelled." }]
+                });
+                emitEnvelope(envelope, options.format);
+                process.exitCode = EXIT_CODE.USAGE;
+                return;
+              }
+              profile = selectedProfile;
+
+              const selectedModules = await selectModulesInteractive(profile);
+              if (!selectedModules) {
+                const envelope = createEnvelope({
+                  ok: false,
+                  command: "init",
+                  data: {},
+                  warnings: [],
+                  errors: [{ message: "Module selection was cancelled." }]
+                });
+                emitEnvelope(envelope, options.format);
+                process.exitCode = EXIT_CODE.USAGE;
+                return;
+              }
+
+              const resolved = resolveInitConfig(
+                {
+                  profile,
+                  modules: selectedModules
+                },
+                {
+                  autoFixDependencies: true
+                }
+              );
+              modules = resolved.modules;
+              taskMode = resolved.taskMode;
+              questionnaireOnInit = resolved.questionnaireOnInit;
+              if (resolved.autoAddedModules.length > 0) {
+                initWarnings.push({
+                  message:
+                    `Auto-enabled dependent modules: ${resolved.autoAddedModules.join(", ")}.`
+                });
+              }
+
+              const selectedTaskMode = await selectTaskModeInteractive();
+              if (!selectedTaskMode) {
+                const envelope = createEnvelope({
+                  ok: false,
+                  command: "init",
+                  data: {},
+                  warnings: [],
+                  errors: [{ message: "Task mode selection was cancelled." }]
+                });
+                emitEnvelope(envelope, options.format);
+                process.exitCode = EXIT_CODE.USAGE;
+                return;
+              }
+              const taskResolved = resolveInitConfig(
+                {
+                  profile,
+                  modules,
+                  taskMode: selectedTaskMode,
+                  questionnaireOnInit: questionnaireOnInit ?? undefined
+                },
+                {
+                  autoFixDependencies: true
+                }
+              );
+              taskMode = taskResolved.taskMode;
+
+              const selectedQuestionnaireOnInit = await selectQuestionnaireOnInitInteractive();
+              if (selectedQuestionnaireOnInit === null) {
+                const envelope = createEnvelope({
+                  ok: false,
+                  command: "init",
+                  data: {},
+                  warnings: [],
+                  errors: [{ message: "Questionnaire selection was cancelled." }]
+                });
+                emitEnvelope(envelope, options.format);
+                process.exitCode = EXIT_CODE.USAGE;
+                return;
+              }
+              const qaResolved = resolveInitConfig(
+                {
+                  profile,
+                  modules,
+                  taskMode: taskMode ?? undefined,
+                  questionnaireOnInit: selectedQuestionnaireOnInit
+                },
+                {
+                  autoFixDependencies: true
+                }
+              );
+              questionnaireOnInit = qaResolved.questionnaireOnInit;
+
+              if (modules.includes("mcp")) {
+                const selectedProviders = await selectMcpProvidersInteractive(profile);
+                if (!selectedProviders) {
+                  const envelope = createEnvelope({
+                    ok: false,
+                    command: "init",
+                    data: {},
+                    warnings: [],
+                    errors: [{ message: "MCP providers selection was cancelled." }]
+                  });
+                  emitEnvelope(envelope, options.format);
+                  process.exitCode = EXIT_CODE.USAGE;
+                  return;
+                }
+                const providerResolved = resolveInitConfig(
+                  {
+                    profile,
+                    modules,
+                    taskMode: taskMode ?? undefined,
+                    questionnaireOnInit: questionnaireOnInit ?? undefined,
+                    enableMcpProviders: selectedProviders
+                  },
+                  {
+                    autoFixDependencies: true
+                  }
+                );
+                enableMcpProviders = providerResolved.enableMcpProviders;
+              }
+
+              const confirmed = await confirmInitConfigurationInteractive({
+                selectedAgent,
+                uiLocale,
+                profile,
+                modules,
+                taskMode,
+                questionnaireOnInit,
+                enableMcpProviders
+              });
+              if (!confirmed) {
+                const envelope = createEnvelope({
+                  ok: false,
+                  command: "init",
+                  data: {},
+                  warnings: [],
+                  errors: [{ message: "Init configuration was cancelled by user." }]
+                });
+                emitEnvelope(envelope, options.format);
+                process.exitCode = EXIT_CODE.USAGE;
+                return;
+              }
+            }
+
+            const finalResolved = resolveInitConfig(
+              {
+                profile,
+                modules: modules.length > 0 ? modules : undefined,
+                taskMode: taskMode ?? undefined,
+                questionnaireOnInit: questionnaireOnInit ?? undefined,
+                enableMcpProviders
+              },
+              {
+                autoFixDependencies: options.nonInteractive !== true
+              }
+            );
+            profile = finalResolved.profile;
+            modules = finalResolved.modules;
+            taskMode = finalResolved.taskMode;
+            questionnaireOnInit = finalResolved.questionnaireOnInit;
+            enableMcpProviders = finalResolved.enableMcpProviders;
+            if (finalResolved.autoAddedModules.length > 0) {
+              initWarnings.push({
+                message: `Auto-enabled dependent modules: ${finalResolved.autoAddedModules.join(", ")}.`
+              });
+            }
+            if (finalResolved.errors.length > 0) {
+              const envelope = createEnvelope({
+                ok: false,
+                command: "init",
+                data: {
+                  nonInteractive: options.nonInteractive === true
+                },
+                warnings: initWarnings,
+                errors: finalResolved.errors.map((message) => ({ message }))
+              });
+              emitEnvelope(envelope, options.format);
+              process.exitCode = EXIT_CODE.USAGE;
+              return;
             }
 
             const report = context.initializer.init(targetDir, {
               force: options.force ?? false,
               agent: selectedAgent ?? undefined,
-              uiLocale: uiLocale ?? undefined
+              uiLocale: uiLocale ?? undefined,
+              profile,
+              modules,
+              taskMode: taskMode ?? undefined,
+              questionnaireOnInit: questionnaireOnInit ?? undefined,
+              enableMcpProviders
             });
             const envelope = createEnvelope({
               ok: report.ok,
@@ -527,9 +1067,14 @@ export const builtInCommands: CommandDefinition[] = [
                 projectRoot: report.projectRoot,
                 selectedAgent: report.selectedAgent,
                 uiLocale: report.uiLocale,
+                profile,
+                modules,
+                taskMode,
+                questionnaireOnInit,
+                enableMcpProviders,
                 createdFiles: report.createdFiles
               },
-              warnings: report.warnings,
+              warnings: [...initWarnings, ...report.warnings],
               errors: report.errors
             });
 
@@ -540,7 +1085,13 @@ export const builtInCommands: CommandDefinition[] = [
                 console.log(`Preflight: ${report.preflightState}`);
                 console.log(`Agent: ${report.selectedAgent}`);
                 console.log(`UI locale: ${report.uiLocale}`);
+                console.log(`Profile: ${profile}`);
                 console.log(`Created: ${report.createdFiles.join(", ")}`);
+                if (initWarnings.length > 0) {
+                  for (const warning of initWarnings) {
+                    console.log(`- [WARN] ${warning.message}`);
+                  }
+                }
               } else {
                 console.error("Init failed.");
                 for (const error of report.errors) {
