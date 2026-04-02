@@ -45,6 +45,11 @@ Before starting work:
 1. Read .ai/manifest.yaml first.
 2. Follow .ai/config.yaml and .ai/rules/* as source of truth.
 3. Use .ai as the primary configuration layer for project interaction.
+4. If .ai/manifest.yaml has qa_completed: false, start with QA hydration:
+   - create/update .ai/qa.yaml questions for missing context
+   - ask only missing or partial questions
+   - language for user-facing questions must match manifest.ui_locale
+5. Do not switch QA question language unless user explicitly asks.
 `;
 
 const CLAUDE_BRIDGE_CONTENT = `# CLAUDE Bridge
@@ -53,6 +58,11 @@ Before starting work:
 1. Read .ai/manifest.yaml first.
 2. Follow .ai/config.yaml and .ai/rules/* as source of truth.
 3. Use .ai as the primary configuration layer for project interaction.
+4. If .ai/manifest.yaml has qa_completed: false, start with QA hydration:
+   - create/update .ai/qa.yaml questions for missing context
+   - ask only missing or partial questions
+   - language for user-facing questions must match manifest.ui_locale
+5. Do not switch QA question language unless user explicitly asks.
 `;
 
 export const BRIDGE_CONTENT_BY_FILE: Record<BridgeFileName, string> = {

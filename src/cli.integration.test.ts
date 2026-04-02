@@ -54,6 +54,7 @@ describe("CLI smoke flows", () => {
     const manifest = parseYaml(manifestRaw) as Record<string, unknown>;
     expect(manifest.generator).toBe("ai-config");
     expect(manifest.managed_by).toBe("ai-config");
+    expect(manifest.qa_required_on_start).toBe(true);
     expect(manifest.selected_agent).toBe("codex");
     expect(manifest.ui_locale).toBe("en");
     expect(result.stdout).toContain("\"preflightState\": \"fresh\"");
@@ -102,6 +103,42 @@ describe("CLI smoke flows", () => {
     expect(result.stdout).toContain("\"ok\": false");
     expect(result.stdout).toContain("\"preflightState\": \"foreign\"");
     expect(result.stdout).toContain("Detected foreign ./.ai");
+  });
+
+  test("validate warns when qa question language does not match ru locale", () => {
+    const projectPath = createTempProject();
+    const initResult = runCli([
+      "init",
+      "--cwd",
+      projectPath,
+      "--non-interactive",
+      "--agent",
+      "codex",
+      "--ui-locale",
+      "ru",
+      "--format",
+      "json"
+    ]);
+    expect(initResult.status).toBe(0);
+
+    const qaPath = path.join(projectPath, ".ai", "qa.yaml");
+    fs.writeFileSync(
+      qaPath,
+      [
+        'schema_version: "1"',
+        'status: "in_progress"',
+        "questions:",
+        '  - id: "q1"',
+        '    question: "What is your project goal?"'
+      ].join("\n"),
+      "utf8"
+    );
+
+    const validateResult = runCli(["validate", "--cwd", projectPath, "--format", "json"]);
+    expect(validateResult.status).toBe(0);
+    expect(validateResult.stdout).toContain("\"ok\": true");
+    expect(validateResult.stdout).toContain("\"warnings\": [");
+    expect(validateResult.stdout).toContain("QA language mismatch");
   });
 
   test("init --non-interactive fails with usage error when required flags are missing", () => {

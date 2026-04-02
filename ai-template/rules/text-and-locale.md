@@ -1,13 +1,11 @@
 # Text and Locale Rules
 
-<!--
-Project-specific file.
-AI agent should fill this based on actual language requirements in the repository.
+Core rules:
+- Source of truth for user-facing language: `.ai/manifest.yaml -> ui_locale`.
+- All questions in `.ai/qa.yaml` must be generated in `ui_locale`.
+- Do not switch QA/user-facing language unless user explicitly asks.
+- Keep file encoding UTF-8.
+- Preserve terminology consistency from project glossary and requirements.
 
-Include:
-- Preferred language(s) for user-facing text
-- Encoding requirements (e.g. UTF-8)
-- Terminology consistency and glossary usage
-- Rules for translating/changing locale-dependent strings
--->
-
+Project-specific additions:
+- Add repository-specific translation/localization constraints below.

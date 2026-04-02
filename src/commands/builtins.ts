@@ -464,6 +464,7 @@ const validateManifestContent = (manifest: Record<string, unknown>): InitIssue[]
   const managedBy = manifest.managed_by;
   const selectedAgent = manifest.selected_agent;
   const uiLocale = manifest.ui_locale;
+  const qaRequiredOnStart = manifest.qa_required_on_start;
 
   if (typeof schemaVersion !== "string" || schemaVersion.trim().length === 0) {
     errors.push({
@@ -500,7 +501,93 @@ const validateManifestContent = (manifest: Record<string, unknown>): InitIssue[]
     });
   }
 
+  if (typeof qaRequiredOnStart !== "boolean") {
+    errors.push({
+      file: `${DEFAULT_CONFIG_ROOT}/manifest.yaml`,
+      message: "Missing or invalid 'qa_required_on_start'."
+    });
+  }
+
   return errors;
+};
+
+const collectQaQuestionTexts = (qa: Record<string, unknown>): string[] => {
+  const texts: string[] = [];
+  const directQuestions = qa.questions;
+  if (Array.isArray(directQuestions)) {
+    for (const questionDef of directQuestions) {
+      if (!questionDef || typeof questionDef !== "object" || Array.isArray(questionDef)) {
+        continue;
+      }
+      const questionText = (questionDef as Record<string, unknown>).question;
+      if (typeof questionText === "string" && questionText.trim().length > 0) {
+        texts.push(questionText);
+      }
+    }
+  }
+
+  const sections = qa.sections;
+  if (Array.isArray(sections)) {
+    for (const sectionDef of sections) {
+      if (!sectionDef || typeof sectionDef !== "object" || Array.isArray(sectionDef)) {
+        continue;
+      }
+      const questions = (sectionDef as Record<string, unknown>).questions;
+      if (!Array.isArray(questions)) {
+        continue;
+      }
+      for (const questionDef of questions) {
+        if (!questionDef || typeof questionDef !== "object" || Array.isArray(questionDef)) {
+          continue;
+        }
+        const questionText = (questionDef as Record<string, unknown>).question;
+        if (typeof questionText === "string" && questionText.trim().length > 0) {
+          texts.push(questionText);
+        }
+      }
+    }
+  }
+
+  return texts;
+};
+
+const containsCyrillic = (text: string): boolean => /[А-Яа-яЁё]/.test(text);
+const containsLatinLetters = (text: string): boolean => /[A-Za-z]/.test(text);
+
+const validateQaLocaleConsistency = (
+  manifest: Record<string, unknown> | null,
+  qa: Record<string, unknown> | null
+): InitIssue[] => {
+  const warnings: InitIssue[] = [];
+  if (!manifest || !qa) {
+    return warnings;
+  }
+
+  const uiLocaleRaw = manifest.ui_locale;
+  if (typeof uiLocaleRaw !== "string") {
+    return warnings;
+  }
+  const uiLocale = uiLocaleRaw.trim().toLowerCase();
+  const qaQuestionTexts = collectQaQuestionTexts(qa);
+  if (qaQuestionTexts.length === 0) {
+    return warnings;
+  }
+
+  if (uiLocale === "ru" || uiLocale.startsWith("ru-")) {
+    const mismatchedQuestions = qaQuestionTexts.filter(
+      (text) => containsLatinLetters(text) && !containsCyrillic(text)
+    );
+    if (mismatchedQuestions.length > 0) {
+      warnings.push({
+        file: asConfigFilePath("qa.yaml"),
+        message:
+          `QA language mismatch with ui_locale="${uiLocaleRaw}". ` +
+          "Detected likely non-Russian question text; generate QA questions in ui_locale."
+      });
+    }
+  }
+
+  return warnings;
 };
 
 const validateConfigContent = (config: Record<string, unknown>): InitIssue[] => {
@@ -1259,8 +1346,11 @@ export const builtInCommands: CommandDefinition[] = [
           const manifestPath = path.join(aiRoot, "manifest.yaml");
           const configPath = path.join(aiRoot, "config.yaml");
           const modulesPath = path.join(aiRoot, "modules.yaml");
+          const qaPath = path.join(aiRoot, "qa.yaml");
           const warnings: InitIssue[] = [];
           const errors: InitIssue[] = [];
+          let parsedManifest: Record<string, unknown> | null = null;
+          let parsedQa: Record<string, unknown> | null = null;
 
           if (preflight.state === "fresh") {
             errors.push({
@@ -1298,7 +1388,14 @@ export const builtInCommands: CommandDefinition[] = [
             );
             errors.push(...manifestReadResult.errors);
             if (manifestReadResult.content) {
+              parsedManifest = manifestReadResult.content;
               errors.push(...validateManifestContent(manifestReadResult.content));
+            }
+
+            const qaReadResult = readYamlObject(qaPath, asConfigFilePath("qa.yaml"));
+            errors.push(...qaReadResult.errors);
+            if (qaReadResult.content) {
+              parsedQa = qaReadResult.content;
             }
 
             const configReadResult = readYamlObject(configPath, asConfigFilePath("config.yaml"));
@@ -1329,6 +1426,8 @@ export const builtInCommands: CommandDefinition[] = [
                 errors.push(...validateWorkflowRolesAgainstAgents(aiRoot));
               }
             }
+
+            warnings.push(...validateQaLocaleConsistency(parsedManifest, parsedQa));
           }
 
           const ok = errors.length === 0;

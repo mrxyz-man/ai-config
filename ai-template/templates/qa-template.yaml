@@ -1,30 +1,35 @@
 schema_version: "1"
 status: "not_started" # not_started | in_progress | completed
 
+metadata:
+  question_locale_source: ".ai/manifest.yaml#ui_locale"
+  question_locale_policy: "strict"
+  guidance: "All user-facing question text must match ui_locale from manifest."
+
 sections:
   - id: "project-context"
-    title: "Project Context"
+    title: "Context Bootstrap"
     required: true
     questions:
       - id: "project-goal"
-        question: "What is the main goal of this project?"
+        question: "<generate question in ui_locale: main project goal>"
         required: true
         targets:
           - "project/description.md"
-        help_text: "Describe business purpose and expected user value in 2-4 sentences."
-        example_answer: "A storefront app for local shops to manage catalog and online orders."
+        help_text: "<generate help text in ui_locale>"
+        example_answer: "<generate example answer in ui_locale>"
         answer: null
         answer_status: "missing" # missing | partial | complete
         updated_at: null
 
       - id: "tech-stack"
-        question: "What technologies are currently used in the project?"
+        question: "<generate question in ui_locale: current tech stack>"
         required: true
         targets:
           - "project/tech-stack.yaml"
           - "config.yaml"
-        help_text: "List runtime, framework, database, package manager, and test stack."
-        example_answer: "Node 24, TypeScript, Express, PostgreSQL, npm, Jest."
+        help_text: "<generate help text in ui_locale>"
+        example_answer: "<generate example answer in ui_locale>"
         answer: null
         answer_status: "missing"
         updated_at: null

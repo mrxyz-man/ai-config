@@ -405,6 +405,7 @@ const writeManifestFile = (params: {
     ui_locale: params.uiLocale,
     template_version: TEMPLATE_VERSION,
     qa_version: "1",
+    qa_required_on_start: true,
     qa_completed: false,
     qa_completed_at: null
   });

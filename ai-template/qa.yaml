@@ -5,5 +5,7 @@ metadata:
   source_template: "templates/qa-template.yaml"
   hydration_owner: "ai-agent"
   guidance: "Populate this file incrementally with targeted questions and answers."
+  question_locale_source: ".ai/manifest.yaml#ui_locale"
+  question_locale_policy: "strict"
 
 questions: []
